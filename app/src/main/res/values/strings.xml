@@ -1,0 +1,28 @@
+<resources>
+    <string name="app_name">Focus Lock</string>
+    <string name="accessibility_desc">TODO</string>
+    <string name="app_adapter_name_generic">通用文本匹配</string>
+    <string name="app_adapter_config_title_generic_keyword_match_rule">关键词匹配规则</string>
+    <string name="app_adapter_config_choice_generic_all_contains">全部包含</string>
+    <string name="app_adapter_config_choice_generic_part_contains">部分包含</string>
+    <string name="app_adapter_config_choice_generic_all_not_contains">全不包含</string>
+    <string name="app_adapter_config_choice_generic_part_or_any_contains">部分或全部包含</string>
+    <string name="app_adapter_config_choice_generic_part_or_all_not_contains">部分或全部不包含</string>
+    <string name="app_adapter_config_title_generic_keywords">关键词列表</string>
+    <string name="app_adapter_config_desc_generic_keywords">匹配界面中的关键词</string>
+    <string name="app_adapter_config_title_generic_logic_relation">关系</string>
+    <string name="app_adapter_config_choice_generic_and">与</string>
+    <string name="app_adapter_config_choice_generic_or">或</string>
+    <string name="app_adapter_config_title_generic_activity_match_rule">Activity 类名匹配规则</string>
+    <string name="app_adapter_config_choice_generic_is">是</string>
+    <string name="app_adapter_config_choice_generic_not">否</string>
+    <string name="app_adapter_config_title_generic_activities">Activity 类名列表</string>
+    <string name="app_adapter_config_title_generic_action">措施</string>
+    <string name="app_adapter_config_choice_generic_block">拦截</string>
+    <string name="app_adapter_config_choice_generic_allow">放行</string>
+    <string name="lock_overlay_warning">距离锁机开始还有 %1$d 秒！</string>
+    <string name="text_field_label_input_seconds">请输入秒数</string>
+    <string name="text_field_supporting_text_duration_range_seconds">范围: %1$d - %2$d 秒</string>
+    <string name="ok_with_seconds">确定 (%1$ds)</string>
+    <string name="global_profile_name">全局配置</string>
+</resources>
