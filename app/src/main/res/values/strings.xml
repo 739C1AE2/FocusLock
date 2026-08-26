@@ -73,9 +73,9 @@
     <string name="nav_home">首页</string>
     <string name="nav_schedules">计划</string>
     <string name="nav_profiles">配置</string>
-    <string name="no_days">无</string>
-    <string name="all_day">每天</string>
-    <string name="weekdays">工作日</string>
+    <string name="repeat_once">不重复</string>
+    <string name="repeat_all_day">每天</string>
+    <string name="repeat_weekdays">工作日</string>
     <string name="failed_to_load_schedule">未找到相关时间段配置</string>
     <string name="schedule_name_empty_error">名称不能为空</string>
     <string name="profile_name_empty_error">名称不能为空</string>

@@ -402,6 +402,11 @@ class LockEngine(
         if (engineState.value is EngineState.Idle) {
             return
         }
+        (engineState.value as? EngineState.InSession)?.session?.let {
+            runBlocking {
+                repository.completeSession(it)
+            }
+        }
         countdownJob?.cancel()
         timeTriggerJob?.cancel()
         engineState.value = EngineState.Idle

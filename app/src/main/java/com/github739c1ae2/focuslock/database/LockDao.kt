@@ -79,7 +79,7 @@ interface LockDao {
         AND (
             -- 常规不过夜任务 (比如 08:00 到 12:00)
             (startMinute <= endMinute 
-             AND daysOfWeek LIKE '%' || :todayStr || '%' 
+             AND (daysOfWeek = '' OR daysOfWeek LIKE '%' || :todayStr || '%')
              AND :currentMinute >= startMinute 
              AND :currentMinute < endMinute)
              
@@ -88,7 +88,7 @@ interface LockDao {
             -- 跨天任务的前一天 (比如 22:00 到 23:59)
             -- 此时处于配置的第一天
             (startMinute > endMinute 
-             AND daysOfWeek LIKE '%' || :todayStr || '%' 
+             AND (daysOfWeek = '' OR daysOfWeek LIKE '%' || :todayStr || '%')
              AND :currentMinute >= startMinute)
              
             OR 
@@ -96,7 +96,7 @@ interface LockDao {
             -- 情况 3：跨天任务的后一天 (比如 00:00 到 06:00)
             -- 此时已经是第二天了，查昨天有没有配置这个任务
             (startMinute > endMinute 
-             AND daysOfWeek LIKE '%' || :yesterdayStr || '%' 
+             AND (daysOfWeek = '' OR daysOfWeek LIKE '%' || :yesterdayStr || '%')
              AND :currentMinute < endMinute)
         )
     """)

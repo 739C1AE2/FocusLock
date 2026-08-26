@@ -169,11 +169,11 @@ private fun ScheduleCard(
                     text = buildString {
                         val days = schedule.schedule.daysOfWeek
                         if (days.isEmpty()) {
-                            append(stringResource(R.string.no_days))
+                            append(stringResource(R.string.repeat_once))
                         } else if (days.size == 7) {
-                            append(stringResource(R.string.all_day))
+                            append(stringResource(R.string.repeat_all_day))
                         } else if (days == WEEKDAY_SET) {
-                            append(stringResource(R.string.weekdays))
+                            append(stringResource(R.string.repeat_weekdays))
                         } else {
                             val dayTexts = schedule.schedule.daysOfWeek.toList()
                                 .sortedBy { it.value }
