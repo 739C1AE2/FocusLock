@@ -19,30 +19,24 @@ import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffo
 import androidx.compose.material3.adaptive.navigationsuite.rememberNavigationSuiteScaffoldState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSerializable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.res.stringResource
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
-import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
-import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.runtime.result.LocalResultEventBus
 import androidx.navigation3.runtime.result.ResultEffect
 import androidx.navigation3.runtime.result.rememberResultEventBusNavEntryDecorator
-import androidx.navigation3.runtime.serialization.NavKeySerializer
 import androidx.navigation3.ui.NavDisplay
-import androidx.savedstate.compose.serialization.serializers.MutableStateSerializer
 import androidx.window.core.layout.WindowSizeClass
 import com.github739c1ae2.focuslock.ui.navigation.AppRoute
 import com.github739c1ae2.focuslock.ui.navigation.NAV_ITEMS
+import com.github739c1ae2.focuslock.ui.navigation.Navigator
+import com.github739c1ae2.focuslock.ui.navigation.rememberNavigationState
 import com.github739c1ae2.focuslock.ui.screen.adapter.AdapterConfigScreen
 import com.github739c1ae2.focuslock.ui.screen.home.HomeScreen
 import com.github739c1ae2.focuslock.ui.screen.profile.AdapterConfigResult
@@ -53,8 +47,6 @@ import com.github739c1ae2.focuslock.ui.screen.schedule.ScheduleEditScreen
 import com.github739c1ae2.focuslock.ui.screen.schedule.ScheduleListScreen
 import com.github739c1ae2.focuslock.ui.theme.FocusLockTheme
 import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.serialization.builtins.SetSerializer
-import kotlinx.serialization.builtins.serializer
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -117,7 +109,7 @@ fun MainApp() {
         NavDisplay(
             backStack = navigationState.backStack,
             onBack = {
-                navigator.forceGoBack()
+                navigator.forceGoBack(null)
             },
             sceneStrategies = listOf(listDetailStrategy),
             entryDecorators = listOf(
@@ -189,18 +181,18 @@ fun MainApp() {
                         profileId = key.profileId,
                         isSinglePane = !isListDetailScene,
                         onBack = {
-                            navigator.safeGoBack()
+                            navigator.safeGoBack(key)
                         },
                         onDirtyChange = {
                             navigator.setRouteDirty(key, it)
                         },
                         onSaved = {
                             if (!isListDetailScene) {
-                                navigator.forceGoBack()
+                                navigator.forceGoBack(key)
                             }
                         },
                         onDeleted = {
-                            navigator.forceGoBack()
+                            navigator.forceGoBack(key)
                         },
                         onConfigureAdapter = { packageName, original ->
                             navigator.popToAndPush(
@@ -221,11 +213,11 @@ fun MainApp() {
                     ScheduleEditScreen(
                         scheduleId = key.scheduleId,
                         onBack = {
-                            navigator.safeGoBack()
+                            navigator.safeGoBack(key)
                         },
                         onSaved = {
                             if (!isListDetailScene) {
-                                navigator.forceGoBack()
+                                navigator.forceGoBack(key)
                             }
                         },
                         isSinglePane = !isListDetailScene,
@@ -233,7 +225,7 @@ fun MainApp() {
                             navigator.setRouteDirty(key, it)
                         },
                         onDeleted = {
-                            navigator.forceGoBack()
+                            navigator.forceGoBack(key)
                         },
                         onProfileCreated = { profileId ->
                             navigator.navigate(AppRoute.ProfileEditor(profileId))
@@ -256,10 +248,10 @@ fun MainApp() {
                                     config = configInfo
                                 )
                             )
-                            navigator.forceGoBack()
+                            navigator.forceGoBack(key)
                         },
                         onCancel = {
-                            navigator.safeGoBack()
+                            navigator.safeGoBack(key)
                         },
                         onDirtyChange = {
                             navigator.setRouteDirty(key, it)
@@ -299,197 +291,8 @@ fun MainApp() {
 
 
         BackHandler(enabled = navigationState.isTopRouteDirty) {
-            navigator.safeGoBack()
+            navigator.safeGoBack(null)
         }
 
-    }
-}
-
-
-sealed interface PendingNavigation {
-    object GoBack : PendingNavigation
-    data class Navigate(val target: NavKey) : PendingNavigation
-    data class PopToAndPush(val anchor: NavKey, val target: NavKey) : PendingNavigation
-}
-
-class NavigationState(
-    val startRoute: AppRoute.TopLevel,
-    topLevelRoute: MutableState<AppRoute.TopLevel>,
-    dirtyKeys: MutableState<Set<NavKey>>,
-    showWarning: MutableState<Boolean>,
-    pendingNavigation: MutableState<PendingNavigation?>,
-    val backStack: NavBackStack<NavKey>
-) {
-    var topLevelRoute by topLevelRoute
-    var dirtyKeys by dirtyKeys
-    var showWarning by showWarning
-    var pendingNavigation by pendingNavigation
-    val isTopRouteDirty: Boolean
-        get() = backStack.lastOrNull()?.let { it in dirtyKeys } ?: false
-}
-
-@Composable
-fun rememberNavigationState(
-    startRoute: AppRoute.TopLevel
-): NavigationState {
-    val topLevelRoute = rememberSerializable(
-        startRoute,
-        serializer = MutableStateSerializer(NavKeySerializer())
-    ) {
-        mutableStateOf(startRoute)
-    }
-    val backStack = rememberNavBackStack(startRoute)
-
-    val dirtyKeys = rememberSerializable(
-        emptySet<NavKey>(),
-        serializer = MutableStateSerializer(SetSerializer(NavKeySerializer()))
-    ) {
-        mutableStateOf(emptySet())
-    }
-
-    val showWarning = rememberSerializable(
-        false,
-        serializer = MutableStateSerializer(Boolean.serializer())
-    ) {
-        mutableStateOf(false)
-    }
-
-    val pendingNavigation = remember {
-        mutableStateOf<PendingNavigation?>(null)
-    }
-
-    return remember(startRoute) {
-        NavigationState(
-            startRoute,
-            topLevelRoute,
-            dirtyKeys,
-            showWarning,
-            pendingNavigation,
-            backStack
-        )
-    }
-}
-
-
-class Navigator(
-    val state: NavigationState
-) {
-
-    fun navigate(route: NavKey) {
-        if (state.backStack.lastOrNull() == route) {
-            return
-        }
-        if (route is AppRoute.TopLevel) {
-            val hasDirtyPage = state.backStack
-                .subList(1, state.backStack.size)
-                .any { it in state.dirtyKeys }
-            if (hasDirtyPage) {
-                state.pendingNavigation = PendingNavigation.Navigate(route)
-                state.showWarning = true
-                return
-            }
-        }
-        forceNavigate(route)
-    }
-
-    fun forceNavigate(route: NavKey) {
-        if (state.backStack.lastOrNull() == route) {
-            return
-        }
-        if (route is AppRoute.TopLevel) {
-            state.backStack.subList(1, state.backStack.size).clear()
-            state.topLevelRoute = route
-        }
-        state.backStack.add(route)
-    }
-
-    fun popToAndPush(anchor: NavKey, target: NavKey) {
-        if (state.backStack.lastOrNull() == target) {
-            return
-        }
-        val anchorIndex = state.backStack.indexOf(anchor)
-        if (anchorIndex != -1) {
-            val routesToBePopped = state.backStack.subList(anchorIndex + 1, state.backStack.size)
-            val hasDirtyPage = routesToBePopped.any { it in state.dirtyKeys }
-
-            if (hasDirtyPage) {
-                state.pendingNavigation = PendingNavigation.PopToAndPush(anchor, target)
-                state.showWarning = true
-                return
-            }
-        }
-        forcePopToAndPush(anchor, target)
-    }
-
-    fun forcePopToAndPush(anchor: NavKey, target: NavKey) {
-        if (state.backStack.lastOrNull() == target) {
-            return
-        }
-        while (state.backStack.isNotEmpty() && state.backStack.lastOrNull() != anchor) {
-            val poppedKey = state.backStack.lastOrNull()
-            if (poppedKey != null) {
-                state.dirtyKeys -= poppedKey
-            }
-            state.backStack.removeLastOrNull()
-        }
-        forceNavigate(target)
-    }
-
-    fun setRouteDirty(key: NavKey, isDirty: Boolean) {
-        state.dirtyKeys = if (isDirty) {
-            state.dirtyKeys + key
-        } else {
-            state.dirtyKeys - key
-        }
-    }
-
-    fun safeGoBack() {
-        if (state.isTopRouteDirty) {
-            state.pendingNavigation = PendingNavigation.GoBack
-            state.showWarning = true
-            return
-        }
-        forceGoBack()
-    }
-
-    fun forceGoBack() {
-        val poppedKey = state.backStack.lastOrNull()
-        if (poppedKey != null) {
-            state.dirtyKeys -= poppedKey
-        }
-        state.showWarning = false
-        state.backStack.removeLastOrNull()
-        if (state.backStack.lastOrNull() == state.startRoute) {
-            state.topLevelRoute = state.startRoute
-        }
-    }
-
-    fun confirmDiscard() {
-        val action = state.pendingNavigation
-        state.showWarning = false
-        state.pendingNavigation = null
-
-        when (action) {
-            is PendingNavigation.GoBack -> {
-                forceGoBack()
-            }
-
-            is PendingNavigation.Navigate -> {
-                forceNavigate(action.target)
-            }
-
-            is PendingNavigation.PopToAndPush -> {
-                forcePopToAndPush(action.anchor, action.target)
-            }
-
-            null -> {
-                forceGoBack()
-            }
-        }
-    }
-
-    fun cancelDiscard() {
-        state.showWarning = false
-        state.pendingNavigation = null
     }
 }

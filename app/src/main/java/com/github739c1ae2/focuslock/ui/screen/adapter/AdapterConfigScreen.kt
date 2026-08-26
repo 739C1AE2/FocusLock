@@ -37,6 +37,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.compose.dropUnlessResumed
 import com.github739c1ae2.focuslock.R
 import com.github739c1ae2.focuslock.adapter.ConfigValue
 
@@ -68,7 +69,7 @@ fun AdapterConfigScreen(
                 },
                 navigationIcon = {
                     if (isSinglePane) {
-                        IconButton(onClick = onCancel) {
+                        IconButton(onClick = dropUnlessResumed { onCancel() }) {
                             Icon(
                                 Icons.AutoMirrored.Filled.ArrowBack,
                                 contentDescription = stringResource(android.R.string.cancel)
@@ -77,7 +78,7 @@ fun AdapterConfigScreen(
                     }
                 },
                 actions = {
-                    TextButton(onClick = {
+                    TextButton(onClick = dropUnlessResumed {
                         onConfirm(
                             state.adapters.find {
                                 it.adapterId == state.selectedId

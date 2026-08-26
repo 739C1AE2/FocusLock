@@ -50,6 +50,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.dropUnlessResumed
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import com.github739c1ae2.focuslock.R
@@ -114,7 +115,7 @@ fun ProfileEditScreen(
                 },
                 navigationIcon = {
                     if (isSinglePane) {
-                        IconButton(onClick = onBack) {
+                        IconButton(onClick = dropUnlessResumed { onBack() }) {
                             Icon(
                                 Icons.AutoMirrored.Filled.ArrowBack,
                                 contentDescription = stringResource(android.R.string.cancel)
@@ -496,7 +497,7 @@ private fun RuleCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.weight(1f)
                 )
-                TextButton(onClick = onConfigure) {
+                TextButton(onClick = dropUnlessResumed { onConfigure() }) {
                     Text(stringResource(R.string.configure))
                 }
             }
