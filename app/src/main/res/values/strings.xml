@@ -1,6 +1,18 @@
 <resources>
     <string name="app_name">Focus Lock</string>
     <string name="accessibility_desc">TODO</string>
+    <string name="app_adapter_name_bilibili">哔哩哔哩</string>
+    <string name="app_adapter_desc_bilibili">拦截视频详情页与全屏播放，可配置放行的 UP主 与视频标题关键词</string>
+    <string name="app_adapter_config_title_bilibili_uploaders">UP主名单</string>
+    <string name="app_adapter_config_desc_bilibili_uploaders">命中以下 UP主 的视频放行（每行一个）</string>
+    <string name="app_adapter_config_title_bilibili_title_keywords">视频标题关键词</string>
+    <string name="app_adapter_config_desc_bilibili_title_keywords">标题包含以下任一关键词的视频放行（每行一个）</string>
+    <string name="app_adapter_config_title_bilibili_up_match_rule">UP主匹配方式</string>
+    <string name="app_adapter_config_choice_bilibili_up_match_contains">包含匹配</string>
+    <string name="app_adapter_config_choice_bilibili_up_match_exact">精确匹配</string>
+    <string name="app_adapter_config_title_bilibili_combo_rule">放行条件组合</string>
+    <string name="app_adapter_config_choice_bilibili_combo_or">任一命中（UP主 或 标题）</string>
+    <string name="app_adapter_config_choice_bilibili_combo_and">全部命中（UP主 且 标题）</string>
     <string name="app_adapter_name_generic">通用文本匹配</string>
     <string name="app_adapter_config_title_generic_keyword_match_rule">关键词匹配规则</string>
     <string name="app_adapter_config_choice_generic_all_contains">全部包含</string>
@@ -100,4 +112,6 @@
     <string name="force_unlock">紧急解除</string>
     <string name="dialog_title_pause">暂时解除锁定</string>
     <string name="confirm_force_unlock">确定要紧急解除锁定吗？</string>
+    <string name="content_desc_remove_item">删除</string>
+    <string name="add_item">添加</string>
 </resources>

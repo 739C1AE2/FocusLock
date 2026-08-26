@@ -5,6 +5,7 @@ object AdapterFactoryRegistry {
 
     init {
         register(GenericAdapter.Factory)
+        register(BiliAdapter.Factory)
     }
 
     private fun register(factory: AppAdapterFactory<*>) {

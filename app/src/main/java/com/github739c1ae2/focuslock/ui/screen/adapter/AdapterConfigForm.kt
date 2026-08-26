@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -18,12 +20,13 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -33,6 +36,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.github739c1ae2.focuslock.R
 import com.github739c1ae2.focuslock.adapter.ChoiceOption
 import com.github739c1ae2.focuslock.adapter.ConfigSpec
 import com.github739c1ae2.focuslock.adapter.ConfigValue
@@ -277,11 +281,16 @@ fun StringListField(
                     modifier = Modifier.weight(1f),
                     placeholder = hintRes?.let { { Text(stringResource(id = it)) } }
                 )
-                TextButton(onClick = {
-                    val newList = list.toMutableList().apply { removeAt(index) }
-                    onListChange(newList)
-                }) {
-                    Text("Remove")
+                IconButton(
+                    onClick = {
+                        val newList = list.toMutableList().apply { removeAt(index) }
+                        onListChange(newList)
+                    }
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = stringResource(R.string.content_desc_remove_item)
+                    )
                 }
             }
         }
@@ -293,7 +302,7 @@ fun StringListField(
             },
             modifier = Modifier.padding(top = 8.dp)
         ) {
-            Text("Add Item")
+            Text(stringResource(R.string.add_item))
         }
     }
 }
