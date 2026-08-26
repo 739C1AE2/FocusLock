@@ -17,6 +17,8 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Android
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -24,6 +26,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -38,8 +41,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -47,70 +51,64 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
-import com.github739c1ae2.focuslock.R
-import com.github739c1ae2.focuslock.engine.EngineState
-import kotlin.time.Duration.Companion.seconds
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
+import coil3.request.ImageRequest
+import com.github739c1ae2.focuslock.R
 import com.github739c1ae2.focuslock.engine.OVERLAY_WINDOW_TYPE
+import com.github739c1ae2.focuslock.util.AppIconRequest
+import com.github739c1ae2.focuslock.util.timestampMillisToClockString
 import kotlinx.coroutines.delay
-import java.time.LocalTime
-import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 @Composable
 fun LockOverlayScreen(
     viewModel: OverlayViewModel
 ) {
-    val engineState by viewModel.engineState.collectAsState()
-    when (val state = engineState) {
-        EngineState.Allowed, EngineState.Idle, EngineState.Paused -> {}
-        is EngineState.Locked -> {
+    val state by viewModel.overlayState.collectAsStateWithLifecycle()
+    when (val state = state) {
+        is OverlayState.Locked -> {
             LockedScreen(state, viewModel)
         }
 
-        is EngineState.Warning -> {
+        is OverlayState.Warning -> {
             WarningScreen(state)
+        }
+
+        is OverlayState.Hidden -> {
+            // Do nothing
         }
     }
 }
 
-fun Int.toTimeString(): String {
-    val hours = this / 60
-    val minutes = this % 60
-
-    val formatter = DateTimeFormatter.ofPattern("HH:mm")
-
-    return LocalTime.of(hours % 24, minutes).format(formatter)
-}
-
 @Composable
-fun LockedScreen(state: EngineState.Locked, viewModel: OverlayViewModel) {
+fun LockedScreen(state: OverlayState.Locked, viewModel: OverlayViewModel) {
     val allowedApps by viewModel.allowedApps.collectAsState()
     var showPauseDialog by remember { mutableStateOf(false) }
     var showUnlockDialog by remember { mutableStateOf(false) }
-    val startTime = state.schedule.startMinute.toTimeString()
-    val endTime = state.schedule.endMinute.toTimeString()
+    val startTime = state.session.startTimeMillis.timestampMillisToClockString(FormatStyle.MEDIUM)
+    val endTime = state.session.endTimeMillis.timestampMillisToClockString(FormatStyle.MEDIUM)
 
-    Surface(
+    Scaffold(
         modifier = Modifier
             .fillMaxSize()
             .background(
-                color = MaterialTheme.colorScheme.background,
-                shape = RoundedCornerShape(16.dp)
+                color = MaterialTheme.colorScheme.background
             )
-            .padding(16.dp, 32.dp)
-    ) {
+    ) { innerPadding ->
         Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                text = "专注时间",
+                text = stringResource(R.string.lock_screen_title),
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold
-            )
-            Text(
-                text = "系统已限制该应用的使用",
-                modifier = Modifier.padding(top = 8.dp, bottom = 32.dp)
             )
 
             Text(
@@ -122,8 +120,7 @@ fun LockedScreen(state: EngineState.Locked, viewModel: OverlayViewModel) {
             )
 
             Text(
-                "允许使用的应用",
-                color = Color.White,
+                stringResource(R.string.allowed_apps),
                 modifier = Modifier.padding(bottom = 16.dp)
             )
             when (val state = allowedApps) {
@@ -153,12 +150,15 @@ fun LockedScreen(state: EngineState.Locked, viewModel: OverlayViewModel) {
                                     .padding(8.dp)
                             ) {
                                 AsyncImage(
-                                    model = app.icon,
+                                    model = ImageRequest.Builder(LocalContext.current)
+                                        .data(AppIconRequest(app.packageName))
+                                        .build(),
                                     contentDescription = app.appName,
                                     contentScale = ContentScale.Crop,
                                     modifier = Modifier
                                         .size(48.dp)
-                                        .clip(RoundedCornerShape(4.dp))
+                                        .clip(RoundedCornerShape(4.dp)),
+                                    placeholder = rememberVectorPainter(Icons.Default.Android)
                                 )
                                 Text(
                                     app.appName,
@@ -172,28 +172,27 @@ fun LockedScreen(state: EngineState.Locked, viewModel: OverlayViewModel) {
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // 两个保命按钮
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 Button(
                     onClick = { showPauseDialog = true },
                     enabled = true, // TODO: 额度校验闭环：没有额度直接变灰！
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                 ) {
-                    Text("暂停")
+                    Text(stringResource(R.string.pause))
                 }
 
                 OutlinedButton(
                     onClick = { showUnlockDialog = true },
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
                 ) {
-                    Text("紧急解除")
+                    Text(stringResource(R.string.force_unlock))
                 }
             }
         }
     }
     if (showPauseDialog) {
         DurationInputDialog(
-            "暂时解除锁定",
+            stringResource(R.string.dialog_title_pause),
             minSeconds = 5,
             maxSeconds = 180,
             onDismiss = { showPauseDialog = false },
@@ -206,8 +205,8 @@ fun LockedScreen(state: EngineState.Locked, viewModel: OverlayViewModel) {
 
     if (showUnlockDialog) {
         CountDownConfirmDialog(
-            "强制退出",
-            "确定要紧急解除锁定吗？",
+            stringResource(R.string.force_unlock),
+            stringResource(R.string.confirm_force_unlock),
             secondsToWait = 15,
             onDismiss = { showUnlockDialog = false },
             onConfirm = {
@@ -219,7 +218,7 @@ fun LockedScreen(state: EngineState.Locked, viewModel: OverlayViewModel) {
 }
 
 @Composable
-fun WarningScreen(state: EngineState.Warning) {
+fun WarningScreen(state: OverlayState.Warning) {
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -353,7 +352,7 @@ fun CountDownConfirmDialog(
 @Composable
 fun WarningScreenPreview() {
     WarningScreen(
-        state = EngineState.Warning(
+        state = OverlayState.Warning(
             remaining = 10.seconds
         )
     )

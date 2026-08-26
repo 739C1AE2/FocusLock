@@ -1,15 +1,26 @@
 package com.github739c1ae2.focuslock.database
 
-import androidx.room.Entity
-import androidx.room.ForeignKey
-import androidx.room.Index
-import androidx.room.PrimaryKey
+import androidx.annotation.StringRes
+import androidx.room3.ColumnInfo
+import androidx.room3.Entity
+import androidx.room3.ForeignKey
+import androidx.room3.Index
+import androidx.room3.PrimaryKey
+import com.github739c1ae2.focuslock.R
 import com.github739c1ae2.focuslock.adapter.ConfigValue
 import java.time.DayOfWeek
 import java.time.Instant
 import java.time.ZoneId
 
 const val GLOBAL_PROFILE_ID = 1L
+
+val WEEKDAY_SET = setOf(
+    DayOfWeek.MONDAY,
+    DayOfWeek.TUESDAY,
+    DayOfWeek.WEDNESDAY,
+    DayOfWeek.THURSDAY,
+    DayOfWeek.FRIDAY
+)
 
 @Entity(
     tableName = "schedules",
@@ -18,7 +29,7 @@ const val GLOBAL_PROFILE_ID = 1L
             entity = ProfileEntity::class,
             parentColumns = ["id"],
             childColumns = ["profileId"],
-            onDelete = ForeignKey.RESTRICT
+            onDelete = ForeignKey.SET_DEFAULT
         )
     ],
     indices = [Index("profileId")]
@@ -29,42 +40,77 @@ data class ScheduleEntity(
     val daysOfWeek: Set<DayOfWeek>,
     val startMinute: Int,
     val endMinute: Int,
-    val profileId: Long,
+    @ColumnInfo(defaultValue = "$GLOBAL_PROFILE_ID")
+    val profileId: Long = GLOBAL_PROFILE_ID,
     val isActive: Boolean = true
 ) {
-    fun getEndTimeMillisForToday(nowMillis: Long): Long {
+    fun getStartAndEndTimeMillis(nowMillis: Long): Pair<Long, Long> {
         val zoneId = ZoneId.systemDefault()
         val now = Instant.ofEpochMilli(nowMillis).atZone(zoneId)
         val currentMinute = now.hour * 60 + now.minute
 
-        var targetDate = now.toLocalDate()
+        var startDate = now.toLocalDate()
+        var endDate = now.toLocalDate()
 
         if (startMinute > endMinute) {
             // 这是一个跨天任务
             if (currentMinute >= startMinute) {
                 // 当前时间大于开始时间，说明现在是前一天
                 // 那么它的结束时间应该在第二天
-                targetDate = targetDate.plusDays(1)
+                endDate = endDate.plusDays(1)
+            } else {
+                // 如果 currentMinute < endMinute，说明现在是第二天了
+                // 那么它的开始时间应该在前一天
+                startDate = startDate.minusDays(1)
             }
-            // 如果 currentMinute <= endMinute，说明现在是第二天了，不用加天数
         }
 
-        val endHour = endMinute / 60
-        val endMin = endMinute % 60
-
-        return targetDate.atTime(endHour, endMin)
+        val startTime = startDate.atTime(startMinute / 60, startMinute % 60)
             .atZone(zoneId)
             .toInstant()
             .toEpochMilli()
+        val endTime = endDate.atTime(endMinute / 60, endMinute % 60)
+            .atZone(zoneId)
+            .toInstant()
+            .toEpochMilli()
+        return Pair(startTime, endTime)
     }
 }
 
-enum class FilterMode(val value: Int) {
+@Entity(
+    tableName = "quick_lock",
+    foreignKeys = [
+        ForeignKey(
+            entity = ProfileEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["profileId"],
+            onDelete = ForeignKey.SET_DEFAULT
+        )
+    ],
+    indices = [Index("profileId")]
+)
+data class QuickLockEntity(
+    @PrimaryKey val id: Int = 1,
+    @ColumnInfo(defaultValue = "$GLOBAL_PROFILE_ID")
+    val profileId: Long = GLOBAL_PROFILE_ID,
+    val startTimestamp: Long,
+    val endTimestamp: Long
+)
+
+enum class AppRuleMode(val value: Int) {
     WHITELIST(0),
     BLACKLIST(1);
 
     companion object {
         fun fromInt(value: Int) = entries.firstOrNull { it.value == value }
+    }
+
+    @StringRes
+    fun toStringRes(): Int {
+        return when (this) {
+            WHITELIST -> R.string.app_rule_mode_whitelist
+            BLACKLIST -> R.string.app_rule_mode_blacklist
+        }
     }
 }
 
@@ -77,8 +123,8 @@ data class ProfileEntity(
     val name: String,
     val isGlobal: Boolean = false,
 
-    val userAppMode: FilterMode = FilterMode.WHITELIST,   // 默认普通应用全锁
-    val systemAppMode: FilterMode = FilterMode.BLACKLIST  // 默认系统应用全放
+    val userAppMode: AppRuleMode = AppRuleMode.WHITELIST,   // 默认普通应用全锁
+    val systemAppMode: AppRuleMode = AppRuleMode.BLACKLIST  // 默认系统应用全放
 )
 
 @Entity(

@@ -1,6 +1,7 @@
 package com.github739c1ae2.focuslock.service
 
 import android.accessibilityservice.AccessibilityService
+import android.annotation.SuppressLint
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import com.github739c1ae2.focuslock.database.LockRepository
@@ -8,6 +9,7 @@ import com.github739c1ae2.focuslock.engine.LockEngine
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 
+@SuppressLint("AccessibilityPolicy")
 @AndroidEntryPoint
 class AppMonitorService : AccessibilityService() {
 

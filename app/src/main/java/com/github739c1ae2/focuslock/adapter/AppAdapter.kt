@@ -42,7 +42,7 @@ interface AppAdapter {
 
 }
 
-interface AppAdapterFactory<T: AppAdapter> {
+interface AppAdapterFactory<T : AppAdapter> {
     val configSchema: List<ConfigSpec>
 
     val adapterId: String
@@ -53,7 +53,29 @@ interface AppAdapterFactory<T: AppAdapter> {
     @get:StringRes
     val description: Int?
 
-    fun canHandle(packageName: String) : Boolean
+    fun canHandle(packageName: String): Boolean
 
-    fun create(config: Map<String, ConfigValue>) : T
+    fun create(config: Map<String, ConfigValue>): T
+
+    fun defaultConfig(packageName: String? = null): Map<String, ConfigValue> {
+        val map = mutableMapOf<String, ConfigValue>()
+        configSchema.forEach { spec ->
+            when (spec) {
+                is ConfigSpec.Switch -> map[spec.key] =
+                    ConfigValue.BooleanValue(spec.defaultValue)
+
+                is ConfigSpec.StringList -> map[spec.key] =
+                    ConfigValue.StringListValue(emptyList())
+
+                is ConfigSpec.RadioGroup -> spec.defaultSelectedKey?.let {
+                    map[spec.key] = ConfigValue.StringValue(it)
+                }
+
+                is ConfigSpec.DropdownList -> spec.defaultSelectedKey?.let {
+                    map[spec.key] = ConfigValue.StringValue(it)
+                }
+            }
+        }
+        return map
+    }
 }

@@ -76,12 +76,16 @@ class OverlayManager(private val context: Context, private val lockEngine: LockE
                 when (defaultDisplay?.state) {
                     Display.STATE_OFF -> {
                         Log.d(TAG, "屏幕已关闭")
-                        requireNotNull(lifecycleOwner).onScreenOff()
+                        lifecycleOwner?.onScreenOff()
+                        hideWindow()
                     }
+
                     Display.STATE_ON -> {
                         Log.d(TAG, "屏幕已打开")
-                        requireNotNull(lifecycleOwner).onScreenOn()
+                        lifecycleOwner?.onScreenOn()
+                        updateWindowFlags(lockEngine.engineState.value)
                     }
+
                     else -> {}
                 }
             }
@@ -93,7 +97,12 @@ class OverlayManager(private val context: Context, private val lockEngine: LockE
     init {
         lockEngine.engineScope.launch(Dispatchers.Main) {
             lockEngine.engineState
-                .distinctUntilChangedBy { it::class }
+                .distinctUntilChangedBy {
+                    when (it) {
+                        is EngineState.Idle -> it::class
+                        is EngineState.InSession -> it.sessionState::class
+                    }
+                }
                 .collect { state ->
                     updateWindowFlags(state)
                 }
@@ -106,46 +115,45 @@ class OverlayManager(private val context: Context, private val lockEngine: LockE
                 displayManager.unregisterDisplayListener(displayListener)
                 isListenerRegistered = false
             }
-        } else {
+            removeWindow()
+        } else if (state is EngineState.InSession) {
+
             if (!isListenerRegistered) {
                 displayManager.registerDisplayListener(displayListener, null)
                 isListenerRegistered = true
             }
-        }
-        when (state) {
-            is EngineState.Idle -> {
-                removeWindow()
-            }
 
-            is EngineState.Warning -> {
-                layoutParams.width = WindowManager.LayoutParams.WRAP_CONTENT
-                layoutParams.height = WindowManager.LayoutParams.WRAP_CONTENT
-                layoutParams.flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                        WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
-                layoutParams.alpha = 0.8f
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                    layoutParams.layoutInDisplayCutoutMode =
-                        WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_DEFAULT
+            when (state.sessionState) {
+                is SessionState.Warning -> {
+                    layoutParams.width = WindowManager.LayoutParams.WRAP_CONTENT
+                    layoutParams.height = WindowManager.LayoutParams.WRAP_CONTENT
+                    layoutParams.flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                            WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+                    layoutParams.alpha = 0.8f
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                        layoutParams.layoutInDisplayCutoutMode =
+                            WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_DEFAULT
+                    }
+                    showWindow()
                 }
-                showWindow()
-            }
 
-            is EngineState.Locked -> {
-                // 锁机状态：全屏且拦截所有触摸事件！
-                layoutParams.width = WindowManager.LayoutParams.MATCH_PARENT
-                layoutParams.height = WindowManager.LayoutParams.MATCH_PARENT
-                layoutParams.flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                        WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
-                layoutParams.alpha = 1.0f
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                    layoutParams.layoutInDisplayCutoutMode =
-                        WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+                is SessionState.Locked -> {
+                    // 锁机状态：全屏且拦截所有触摸事件
+                    layoutParams.width = WindowManager.LayoutParams.MATCH_PARENT
+                    layoutParams.height = WindowManager.LayoutParams.MATCH_PARENT
+                    layoutParams.flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                            WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
+                    layoutParams.alpha = 1.0f
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                        layoutParams.layoutInDisplayCutoutMode =
+                            WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+                    }
+                    showWindow()
                 }
-                showWindow()
-            }
 
-            EngineState.Allowed, EngineState.Paused -> {
-                hideWindow()
+                SessionState.Allowed, SessionState.Paused -> {
+                    hideWindow()
+                }
             }
         }
     }
@@ -206,7 +214,7 @@ class OverlayManager(private val context: Context, private val lockEngine: LockE
     }
 
     private fun hideWindow() {
-        if (overlayState == OverlayWindowState.HIDDEN || overlayState == OverlayWindowState.NOT_CREATED) {
+        if (overlayState != OverlayWindowState.SHOWN) {
             return
         }
         Log.d(TAG, "隐藏覆盖窗口")

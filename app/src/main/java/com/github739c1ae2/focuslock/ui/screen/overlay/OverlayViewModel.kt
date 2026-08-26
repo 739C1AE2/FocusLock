@@ -3,20 +3,20 @@ package com.github739c1ae2.focuslock.ui.screen.overlay
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ApplicationInfo
-import android.graphics.drawable.Drawable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.github739c1ae2.focuslock.database.FilterMode
+import com.github739c1ae2.focuslock.database.ActiveLockSession
+import com.github739c1ae2.focuslock.database.AppRuleMode
 import com.github739c1ae2.focuslock.database.LockRepository
 import com.github739c1ae2.focuslock.engine.EngineAction
 import com.github739c1ae2.focuslock.engine.EngineState
 import com.github739c1ae2.focuslock.engine.LockEngine
+import com.github739c1ae2.focuslock.engine.SessionState
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
-import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -34,13 +34,18 @@ import kotlin.time.Duration
 
 data class AllowedAppInfo(
     val packageName: String,
-    val appName: String,
-    val icon: Drawable
+    val appName: String
 )
 
 sealed class AllowedAppListState {
     object Loading : AllowedAppListState()
     data class Loaded(val apps: List<AllowedAppInfo>) : AllowedAppListState()
+}
+
+sealed interface OverlayState {
+    object Hidden : OverlayState
+    data class Locked(val session: ActiveLockSession) : OverlayState
+    data class Warning(val remaining: Duration) : OverlayState
 }
 
 @OptIn(FlowPreview::class, ExperimentalCoroutinesApi::class)
@@ -50,12 +55,30 @@ class OverlayViewModel @AssistedInject constructor(
     private val repository: LockRepository,
 ) : ViewModel() {
 
+    val overlayState: StateFlow<OverlayState> = lockEngine.engineState
+        .map { state ->
+            when (state) {
+                is EngineState.Idle -> OverlayState.Hidden
+                is EngineState.InSession -> {
+                    when (state.sessionState) {
+                        is SessionState.Warning -> OverlayState.Warning(state.sessionState.remaining)
+                        is SessionState.Locked -> OverlayState.Locked(state.session)
+                        is SessionState.Paused,
+                        is SessionState.Allowed -> OverlayState.Hidden
+                    }
+                }
+            }
+        }
+        .distinctUntilChanged()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = OverlayState.Hidden
+        )
 
-    val engineState: StateFlow<EngineState> = lockEngine.engineState
-
-    val allowedApps: StateFlow<AllowedAppListState> = engineState
-        .filterIsInstance<EngineState.Locked>()
-        .map { it.schedule.profileId }
+    val allowedApps: StateFlow<AllowedAppListState> = lockEngine.engineState
+        .filterIsInstance<EngineState.InSession>()
+        .map { it.session.profileId }
         .distinctUntilChanged()
         .flatMapLatest { id ->
             flow {
@@ -86,15 +109,15 @@ class OverlayViewModel @AssistedInject constructor(
                     if (rule.appliedAdapterId != null) {
                         true
                     } else if (isSystemApp) {
-                        profile.systemAppMode == FilterMode.WHITELIST
+                        profile.systemAppMode == AppRuleMode.WHITELIST
                     } else {
-                        profile.userAppMode == FilterMode.WHITELIST
+                        profile.userAppMode == AppRuleMode.WHITELIST
                     }
                 } else {
                     if (isSystemApp) {
-                        profile.systemAppMode == FilterMode.BLACKLIST
+                        profile.systemAppMode == AppRuleMode.BLACKLIST
                     } else {
-                        profile.userAppMode == FilterMode.BLACKLIST
+                        profile.userAppMode == AppRuleMode.BLACKLIST
                     }
                 }
             }
@@ -103,7 +126,6 @@ class OverlayViewModel @AssistedInject constructor(
                 AllowedAppInfo(
                     packageName,
                     it.loadLabel(pm).toString(),
-                    it.loadIcon(pm)
                 )
             }
     }

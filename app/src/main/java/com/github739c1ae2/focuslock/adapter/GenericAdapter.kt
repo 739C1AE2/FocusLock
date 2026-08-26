@@ -46,7 +46,8 @@ class GenericAdapter(
                         "part_or_all_not_contains",
                         R.string.app_adapter_config_choice_generic_part_or_all_not_contains
                     ),
-                )
+                ),
+                defaultSelectedKey = "all_contains",
             ),
             ConfigSpec.StringList(
                 key = "keywords",
@@ -61,7 +62,8 @@ class GenericAdapter(
                 options = listOf(
                     ChoiceOption("and", R.string.app_adapter_config_choice_generic_and),
                     ChoiceOption("or", R.string.app_adapter_config_choice_generic_or),
-                )
+                ),
+                defaultSelectedKey = "and",
             ),
             ConfigSpec.DropdownList(
                 key = "activity_match_rule",
@@ -70,7 +72,8 @@ class GenericAdapter(
                 options = listOf(
                     ChoiceOption("is", R.string.app_adapter_config_choice_generic_is),
                     ChoiceOption("not", R.string.app_adapter_config_choice_generic_not),
-                )
+                ),
+                defaultSelectedKey = "is",
             ),
             ConfigSpec.StringList(
                 key = "activities",
@@ -85,7 +88,8 @@ class GenericAdapter(
                 options = listOf(
                     ChoiceOption("block", R.string.app_adapter_config_choice_generic_block),
                     ChoiceOption("allow", R.string.app_adapter_config_choice_generic_allow),
-                )
+                ),
+                defaultSelectedKey = "block",
             ),
         )
     }

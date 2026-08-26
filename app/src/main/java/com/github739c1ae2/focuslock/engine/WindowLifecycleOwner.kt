@@ -1,8 +1,5 @@
 package com.github739c1ae2.focuslock.engine
 
-import android.content.BroadcastReceiver
-import android.content.Context
-import android.content.Intent
 import android.view.View
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner

@@ -1,14 +1,13 @@
 package com.github739c1ae2.focuslock.database
 
-import androidx.room.ColumnInfo
-import androidx.room.Dao
-import androidx.room.Delete
-import androidx.room.Embedded
-import androidx.room.Insert
-import androidx.room.OnConflictStrategy
-import androidx.room.Query
-import androidx.room.Transaction
-import androidx.room.Update
+import androidx.room3.ColumnInfo
+import androidx.room3.Dao
+import androidx.room3.Embedded
+import androidx.room3.Insert
+import androidx.room3.OnConflictStrategy
+import androidx.room3.Query
+import androidx.room3.Transaction
+import androidx.room3.Update
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -37,11 +36,14 @@ interface LockDao {
     @Update
     suspend fun updateProfile(profile: ProfileEntity)
 
-    @Delete
-    suspend fun deleteProfile(profile: ProfileEntity)
+    @Query("DELETE FROM profiles WHERE id = :id")
+    suspend fun deleteProfileById(id: Long)
 
     @Query("SELECT * FROM profiles")
     fun observeAllProfiles(): Flow<List<ProfileEntity>>
+
+    @Query("SELECT * FROM profiles WHERE id = :id")
+    fun observeProfileById(id: Long): Flow<ProfileEntity?>
 
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -50,11 +52,14 @@ interface LockDao {
     @Update
     suspend fun updateSchedule(schedule: ScheduleEntity)
 
-    @Delete
-    suspend fun deleteSchedule(schedule: ScheduleEntity)
+    @Query("DELETE FROM schedules WHERE id = :id")
+    suspend fun deleteScheduleById(id: Long)
 
     @Query("SELECT * FROM schedules WHERE id = :id LIMIT 1")
     suspend fun getScheduleById(id: Long): ScheduleEntity?
+
+    @Query("UPDATE schedules SET isActive = 0 WHERE id = :scheduleId")
+    suspend fun deactivateSchedule(scheduleId: Long)
 
     @Query("""
         SELECT schedules.*, profiles.name AS profileName 
@@ -64,14 +69,8 @@ interface LockDao {
     """)
     fun observeAllSchedulesWithProfile(): Flow<List<ScheduleWithProfileName>>
 
-    @Query("""
-        SELECT schedules.*, profiles.name AS profileName 
-        FROM schedules 
-        INNER JOIN profiles ON schedules.profileId = profiles.id
-        WHERE schedules.profileId = :profileId
-        ORDER BY schedules.startMinute ASC
-    """)
-    fun observeSchedulesByProfileId(profileId: Long): Flow<List<ScheduleWithProfileName>>
+    @Query("SELECT * FROM schedules WHERE schedules.profileId = :profileId")
+    fun observeSchedulesByProfileId(profileId: Long): Flow<List<ScheduleEntity>>
 
 
     @Query("""
@@ -82,7 +81,7 @@ interface LockDao {
             (startMinute <= endMinute 
              AND daysOfWeek LIKE '%' || :todayStr || '%' 
              AND :currentMinute >= startMinute 
-             AND :currentMinute <= endMinute)
+             AND :currentMinute < endMinute)
              
             OR 
             
@@ -98,7 +97,7 @@ interface LockDao {
             -- 此时已经是第二天了，查昨天有没有配置这个任务
             (startMinute > endMinute 
              AND daysOfWeek LIKE '%' || :yesterdayStr || '%' 
-             AND :currentMinute <= endMinute)
+             AND :currentMinute < endMinute)
         )
     """)
     suspend fun getActiveSchedules(
@@ -109,6 +108,21 @@ interface LockDao {
 
     @Query("SELECT * FROM schedules WHERE isActive = 1")
     suspend fun getAllActiveSchedulesBasic(): List<ScheduleEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun startQuickLock(quickLock: QuickLockEntity)
+
+    @Query("DELETE FROM quick_lock WHERE id = 1")
+    suspend fun stopQuickLock()
+
+    @Query("""
+        SELECT * FROM quick_lock 
+        WHERE id = 1 
+        AND startTimestamp <= :currentTimestampMillis 
+        AND endTimestamp > :currentTimestampMillis 
+        LIMIT 1
+    """)
+    suspend fun getActiveQuickLock(currentTimestampMillis: Long): QuickLockEntity?
 
     @Transaction
     suspend fun replaceProfileRules(profileId: Long, newRules: List<ProfileAppRuleEntity>) {
@@ -125,8 +139,6 @@ interface LockDao {
     @Query("SELECT * FROM profile_app_rules WHERE profileId = :profileId")
     suspend fun getRulesByProfileId(profileId: Long): List<ProfileAppRuleEntity>
 
-    @Query("SELECT * FROM profile_app_rules WHERE profileId = :profileId AND packageName = :packageName LIMIT 1")
-    suspend fun getAppRule(profileId: Long, packageName: String): ProfileAppRuleEntity?
 }
 
 

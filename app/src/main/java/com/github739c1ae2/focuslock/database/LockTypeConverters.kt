@@ -1,6 +1,6 @@
 package com.github739c1ae2.focuslock.database
 
-import androidx.room.TypeConverter
+import androidx.room3.ColumnTypeConverter
 import com.github739c1ae2.focuslock.adapter.ConfigValue
 import kotlinx.serialization.json.Json
 import java.time.DayOfWeek
@@ -8,13 +8,13 @@ import java.time.DayOfWeek
 class LockTypeConverters {
     private val json = Json { ignoreUnknownKeys = true }
 
-    @TypeConverter
+    @ColumnTypeConverter
     fun fromConfigMap(config: Map<String, ConfigValue>?): String {
         if (config == null) return "{}"
         return json.encodeToString(config)
     }
 
-    @TypeConverter
+    @ColumnTypeConverter
     fun toConfigMap(jsonString: String?): Map<String, ConfigValue> {
         if (jsonString.isNullOrBlank()) return emptyMap()
         return try {
@@ -24,24 +24,24 @@ class LockTypeConverters {
         }
     }
 
-    @TypeConverter
-    fun fromFilterMode(mode: FilterMode): Int {
+    @ColumnTypeConverter
+    fun fromFilterMode(mode: AppRuleMode): Int {
         return mode.value
     }
 
-    @TypeConverter
-    fun toFilterMode(value: Int): FilterMode {
-        return FilterMode.fromInt(value) ?: FilterMode.WHITELIST
+    @ColumnTypeConverter
+    fun toFilterMode(value: Int): AppRuleMode {
+        return AppRuleMode.fromInt(value) ?: AppRuleMode.WHITELIST
     }
 
-    @TypeConverter
+    @ColumnTypeConverter
     fun fromDayOfWeekSet(days: Set<DayOfWeek>?): String {
         if (days.isNullOrEmpty()) return ""
         // 转成逗号分隔的字符串，例如 "1,3,5"
         return days.joinToString(",") { it.value.toString() }
     }
 
-    @TypeConverter
+    @ColumnTypeConverter
     fun toDayOfWeekSet(data: String?): Set<DayOfWeek> {
         if (data.isNullOrBlank()) return emptySet()
         return data.split(",")
