@@ -3,6 +3,7 @@ package com.github739c1ae2.focuslock
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.material3.AlertDialog
@@ -67,7 +68,8 @@ fun MainApp() {
     val navigationState = rememberNavigationState(
         startRoute = AppRoute.Home
     )
-    val navigator = remember(navigationState) { Navigator(navigationState) }
+    val activity = LocalActivity.current!!
+    val navigator = remember(navigationState) { Navigator(navigationState, activity) }
     val listDetailStrategy = rememberListDetailSceneStrategy<NavKey>()
     val scaffoldState = rememberNavigationSuiteScaffoldState()
 

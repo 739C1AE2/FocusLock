@@ -1,13 +1,15 @@
 package com.github739c1ae2.focuslock.ui.navigation
 
+import android.app.Activity
 import androidx.navigation3.runtime.NavKey
 
 class Navigator(
-    val state: NavigationState
+    val state: NavigationState,
+    val activity: Activity
 ) {
 
     fun navigate(route: NavKey) {
-        if (state.backStack.lastOrNull() == route) {
+        if (state.backStack.last() == route) {
             return
         }
         if (route is AppRoute.TopLevel) {
@@ -24,18 +26,23 @@ class Navigator(
     }
 
     fun forceNavigate(route: NavKey) {
-        if (state.backStack.lastOrNull() == route) {
+        if (state.backStack.last() == route) {
             return
         }
         if (route is AppRoute.TopLevel) {
             state.backStack.subList(1, state.backStack.size).clear()
             state.topLevelRoute = route
+            if (route == state.startRoute) {
+                // 栈里一定有 startRoute，避免重复添加
+                require(state.backStack.last() == state.startRoute)
+                return
+            }
         }
         state.backStack.add(route)
     }
 
     fun popToAndPush(anchor: NavKey, target: NavKey) {
-        if (state.backStack.lastOrNull() == target) {
+        if (state.backStack.last() == target) {
             return
         }
         val anchorIndex = state.backStack.indexOf(anchor)
@@ -53,10 +60,10 @@ class Navigator(
     }
 
     fun forcePopToAndPush(anchor: NavKey, target: NavKey) {
-        if (state.backStack.lastOrNull() == target) {
+        if (state.backStack.last() == target) {
             return
         }
-        while (state.backStack.isNotEmpty() && state.backStack.lastOrNull() != anchor) {
+        while (state.backStack.size > 1 && state.backStack.lastOrNull() != anchor) {
             val poppedKey = state.backStack.lastOrNull()
             if (poppedKey != null) {
                 state.dirtyKeys -= poppedKey
@@ -75,7 +82,7 @@ class Navigator(
     }
 
     fun safeGoBack(target: NavKey?) {
-        val poppedKey = state.backStack.lastOrNull()
+        val poppedKey = state.backStack.last()
         if (target != null && poppedKey != target) {
             return
         }
@@ -88,15 +95,17 @@ class Navigator(
     }
 
     fun forceGoBack(target: NavKey?) {
-        val poppedKey = state.backStack.lastOrNull()
+        val poppedKey = state.backStack.last()
         if (target != null && poppedKey != target) {
             return
         }
-        if (poppedKey != null) {
-            state.dirtyKeys -= poppedKey
-        }
+        state.dirtyKeys -= poppedKey
         state.showWarning = false
         state.backStack.removeLastOrNull()
+        if (state.backStack.isEmpty()) {
+            activity.finish()
+            return
+        }
         if (state.backStack.lastOrNull() == state.startRoute) {
             state.topLevelRoute = state.startRoute
         }
