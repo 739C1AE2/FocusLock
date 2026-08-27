@@ -114,4 +114,10 @@
     <string name="confirm_force_unlock">确定要紧急解除锁定吗？</string>
     <string name="content_desc_remove_item">删除</string>
     <string name="add_item">添加</string>
+    <string name="nav_settings">设置</string>
+    <string name="settings_title">设置</string>
+    <string name="settings_section_about">关于</string>
+    <string name="settings_licenses_title">许可证信息</string>
+    <string name="settings_licenses_summary">查看使用的第三方库的许可证信息</string>
+    <string name="back">返回</string>
 </resources>

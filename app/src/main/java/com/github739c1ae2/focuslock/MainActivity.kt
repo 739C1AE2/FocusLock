@@ -46,6 +46,8 @@ import com.github739c1ae2.focuslock.ui.screen.profile.ProfileEditViewModel
 import com.github739c1ae2.focuslock.ui.screen.profile.ProfileListScreen
 import com.github739c1ae2.focuslock.ui.screen.schedule.ScheduleEditScreen
 import com.github739c1ae2.focuslock.ui.screen.schedule.ScheduleListScreen
+import com.github739c1ae2.focuslock.ui.screen.settings.LicensesScreen
+import com.github739c1ae2.focuslock.ui.screen.settings.SettingsScreen
 import com.github739c1ae2.focuslock.ui.theme.FocusLockTheme
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -120,9 +122,7 @@ fun MainApp() {
                 rememberResultEventBusNavEntryDecorator()
             ),
             entryProvider = entryProvider {
-                entry<AppRoute.Home>(
-                    metadata = ListDetailSceneStrategy.listPane()
-                ) {
+                entry<AppRoute.Home> {
                     HomeScreen()
                 }
                 entry<AppRoute.Schedules>(
@@ -163,6 +163,27 @@ fun MainApp() {
                             navigator.popToAndPush(
                                 anchor = key,
                                 target = AppRoute.ProfileEditor(profileId)
+                            )
+                        }
+                    )
+                }
+                entry<AppRoute.Settings>(
+                    metadata = ListDetailSceneStrategy.listPane(sceneKey = "Settings")
+                ) {
+                    val isListDetailScene = LocalListDetailSceneScope.current != null
+                    val selectedRoute = isListDetailScene
+                        .takeIf { it }
+                        ?.let {
+                            (navigationState.backStack
+                                .lastOrNull { it is AppRoute.SettingsDetail }
+                                    as? AppRoute.SettingsDetail)
+                        }
+                    SettingsScreen(
+                        selectedRoute = selectedRoute,
+                        onNavigateTo = { route ->
+                            navigator.popToAndPush(
+                                anchor = AppRoute.Settings,
+                                target = route
                             )
                         }
                     )
@@ -257,6 +278,17 @@ fun MainApp() {
                         },
                         onDirtyChange = {
                             navigator.setRouteDirty(key, it)
+                        }
+                    )
+                }
+                entry<AppRoute.Licenses>(
+                    metadata = ListDetailSceneStrategy.detailPane(sceneKey = "Settings")
+                ) {
+                    val isSinglePane = LocalListDetailSceneScope.current == null
+                    LicensesScreen(
+                        isSinglePane = isSinglePane,
+                        onBack = {
+                            navigator.safeGoBack(it)
                         }
                     )
                 }

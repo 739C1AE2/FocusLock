@@ -5,6 +5,7 @@ plugins {
     alias(libs.plugins.ksp)
     alias(libs.plugins.room3)
     alias(libs.plugins.hilt)
+    alias(libs.plugins.aboutLibraries)
 }
 
 android {
@@ -72,6 +73,8 @@ dependencies {
     implementation(libs.androidx.navigation3.ui)
     implementation(libs.coil.compose)
     implementation(libs.hilt.android)
+    implementation(libs.aboutlibraries.core)
+    implementation(libs.aboutlibraries.compose.m3)
     coreLibraryDesugaring(libs.desugar.jdk.libs)
     ksp(libs.androidx.room3.compiler)
     ksp(libs.hilt.compiler)
