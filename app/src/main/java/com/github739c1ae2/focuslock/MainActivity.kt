@@ -2,7 +2,6 @@ package com.github739c1ae2.focuslock
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -24,23 +23,23 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
-import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.runtime.result.LocalResultEventBus
 import androidx.navigation3.runtime.result.ResultEffect
 import androidx.navigation3.runtime.result.rememberResultEventBusNavEntryDecorator
-import androidx.navigation3.scene.Scene
-import androidx.navigation3.scene.SceneDecoratorStrategy
-import androidx.navigation3.scene.SceneDecoratorStrategyScope
 import androidx.navigation3.ui.NavDisplay
 import androidx.window.core.layout.WindowSizeClass
 import com.github739c1ae2.focuslock.ui.navigation.AppRoute
 import com.github739c1ae2.focuslock.ui.navigation.NAV_ITEMS
 import com.github739c1ae2.focuslock.ui.navigation.Navigator
 import com.github739c1ae2.focuslock.ui.navigation.rememberNavigationState
+import com.github739c1ae2.focuslock.ui.navigation.scene.AdaptiveDialogSceneStrategy
+import com.github739c1ae2.focuslock.ui.navigation.scene.rememberAdaptiveDialogSceneStrategy
+import com.github739c1ae2.focuslock.ui.navigation.scene.rememberBackInterceptionSceneDecoratorStrategy
 import com.github739c1ae2.focuslock.ui.screen.adapter.AdapterConfigScreen
 import com.github739c1ae2.focuslock.ui.screen.home.HomeScreen
 import com.github739c1ae2.focuslock.ui.screen.profile.AdapterConfigResult
@@ -75,7 +74,6 @@ fun MainApp() {
     )
     val activity = LocalActivity.current!!
     val navigator = remember(navigationState) { Navigator(navigationState, activity) }
-    val listDetailStrategy = rememberListDetailSceneStrategy<NavKey>()
     val scaffoldState = rememberNavigationSuiteScaffoldState()
 
     val windowAdaptiveInfo = currentWindowAdaptiveInfoV2()
@@ -118,7 +116,10 @@ fun MainApp() {
             onBack = {
                 navigator.forceGoBack(null)
             },
-            sceneStrategies = listOf(listDetailStrategy),
+            sceneStrategies = listOf(
+                rememberListDetailSceneStrategy(),
+                rememberAdaptiveDialogSceneStrategy()
+            ),
             entryDecorators = listOf(
                 rememberSaveableStateHolderNavEntryDecorator(),
                 rememberViewModelStoreNavEntryDecorator(),
@@ -262,14 +263,21 @@ fun MainApp() {
                     )
                 }
                 entry<AppRoute.AdapterConfigEditor>(
-                    metadata = ListDetailSceneStrategy.extraPane(sceneKey = "Profile")
+                    metadata = AdaptiveDialogSceneStrategy.dialog(
+                        // FIXME: BackInterceptionSceneDecoratorStrategy 无法拦截对话框模式下的返回，
+                        //  这里先完全阻止返回键和空白处关闭，来避免用户误触导致丢失。
+                        //  SceneDecoratorStrategyScope<T>.decorateScene: this does not apply to
+                        //  OverlayScene because they are animated separately from non-overlay scenes.
+                        DialogProperties(
+                            dismissOnBackPress = false,
+                            dismissOnClickOutside = false
+                        )
+                    )
                 ) { key ->
-                    val isListDetailScene = LocalListDetailSceneScope.current != null
                     val resultBus = LocalResultEventBus.current
                     AdapterConfigScreen(
                         packageName = key.packageName,
                         original = key.original,
-                        isSinglePane = !isListDetailScene,
                         onConfirm = { configInfo ->
                             resultBus.sendResult<AdapterConfigResult>(
                                 result = AdapterConfigResult(
@@ -279,8 +287,12 @@ fun MainApp() {
                             )
                             navigator.forceGoBack(key)
                         },
-                        onCancel = {
-                            navigator.safeGoBack(key)
+                        onCancel = { force ->
+                            if (force) {
+                                navigator.forceGoBack(key)
+                            } else {
+                                navigator.safeGoBack(key)
+                            }
                         },
                         onDirtyChange = {
                             navigator.setRouteDirty(key, it)
@@ -329,49 +341,4 @@ fun MainApp() {
             )
         }
     }
-}
-
-@Composable
-fun rememberBackInterceptionSceneDecoratorStrategy(navigator: Navigator): BackInterceptionSceneDecoratorStrategy {
-    return remember(navigator) {
-        BackInterceptionSceneDecoratorStrategy(navigator)
-    }
-}
-
-data class BackInterceptionScene(
-    private val scene: Scene<NavKey>,
-    private val navigator: Navigator
-) : Scene<NavKey> {
-    override val key = scene.key
-    override val entries = scene.entries
-    override val previousEntries = scene.previousEntries
-
-    override val content = @Composable {
-        scene.content()
-        val isTopScene = entries.size + previousEntries.size == navigator.state.backStack.size
-        val count = entries.size
-        val enabled = if (isTopScene) {
-            val isDirty by remember(navigator.state.dirtyKeys) {
-                derivedStateOf {
-                    navigator.state.isTopRoutesDirty(count)
-                }
-            }
-            isDirty
-        } else {
-            false
-        }
-        BackHandler(enabled) {
-            navigator.safeGoBackMultiple(count)
-        }
-    }
-
-}
-
-class BackInterceptionSceneDecoratorStrategy(private val navigator: Navigator) : SceneDecoratorStrategy<NavKey> {
-    override fun SceneDecoratorStrategyScope<NavKey>.decorateScene(
-        scene: Scene<NavKey>
-    ): Scene<NavKey> {
-        return BackInterceptionScene(scene, navigator)
-    }
-
 }
