@@ -47,8 +47,7 @@ class Navigator(
         }
         val anchorIndex = state.backStack.indexOf(anchor)
         if (anchorIndex != -1) {
-            val routesToBePopped = state.backStack.subList(anchorIndex + 1, state.backStack.size)
-            val hasDirtyPage = routesToBePopped.any { it in state.dirtyKeys }
+            val hasDirtyPage = state.isTopRoutesDirty(state.backStack.size - anchorIndex - 1)
 
             if (hasDirtyPage) {
                 state.pendingNavigation = PendingNavigation.PopToAndPush(anchor, target)
@@ -86,7 +85,7 @@ class Navigator(
         if (target != null && poppedKey != target) {
             return
         }
-        if (state.isTopRouteDirty) {
+        if (state.isTopRoutesDirty(1)) {
             state.pendingNavigation = PendingNavigation.GoBack(poppedKey)
             state.showWarning = true
             return
@@ -111,6 +110,31 @@ class Navigator(
         }
     }
 
+    fun safeGoBackMultiple(count: Int) {
+        require(count > 0 && count <= state.backStack.size)
+        if (state.isTopRoutesDirty(count)) {
+            state.pendingNavigation = PendingNavigation.GoBackMultiple(count)
+            state.showWarning = true
+            return
+        }
+        forceGoBackMultiple(count)
+    }
+
+    fun forceGoBackMultiple(count: Int) {
+        val poppedKeys = state.backStack.takeLast(count)
+        for (poppedKey in poppedKeys) {
+            state.dirtyKeys -= poppedKey
+            state.backStack.removeLastOrNull()
+        }
+        if (state.backStack.isEmpty()) {
+            activity.finish()
+            return
+        }
+        if (state.backStack.lastOrNull() == state.startRoute) {
+            state.topLevelRoute = state.startRoute
+        }
+    }
+
     fun confirmDiscard() {
         val action = state.pendingNavigation
         state.showWarning = false
@@ -119,6 +143,10 @@ class Navigator(
         when (action) {
             is PendingNavigation.GoBack -> {
                 forceGoBack(action.target)
+            }
+
+            is PendingNavigation.GoBackMultiple -> {
+                forceGoBackMultiple(action.count)
             }
 
             is PendingNavigation.Navigate -> {

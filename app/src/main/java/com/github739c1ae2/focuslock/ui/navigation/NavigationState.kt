@@ -18,6 +18,7 @@ import kotlinx.serialization.builtins.serializer
 
 sealed interface PendingNavigation {
     data class GoBack(val target: NavKey?) : PendingNavigation
+    data class GoBackMultiple(val count: Int) : PendingNavigation
     data class Navigate(val target: NavKey) : PendingNavigation
     data class PopToAndPush(val anchor: NavKey, val target: NavKey) : PendingNavigation
 }
@@ -34,8 +35,11 @@ class NavigationState(
     var dirtyKeys by dirtyKeys
     var showWarning by showWarning
     var pendingNavigation by pendingNavigation
-    val isTopRouteDirty: Boolean
-        get() = backStack.lastOrNull()?.let { it in dirtyKeys } ?: false
+
+    fun isTopRoutesDirty(count: Int = 1): Boolean {
+        val topRoutes = backStack.takeLast(count)
+        return dirtyKeys.intersect(topRoutes.toSet()).isNotEmpty()
+    }
 }
 
 @Composable

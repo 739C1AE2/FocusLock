@@ -18,7 +18,7 @@ android {
 
     defaultConfig {
         applicationId = "com.github739c1ae2.focuslock"
-        minSdk = 23
+        minSdk = 24
         targetSdk = 37
         versionCode = 1
         versionName = "1.0"

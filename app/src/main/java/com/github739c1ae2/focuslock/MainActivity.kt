@@ -32,6 +32,9 @@ import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.runtime.result.LocalResultEventBus
 import androidx.navigation3.runtime.result.ResultEffect
 import androidx.navigation3.runtime.result.rememberResultEventBusNavEntryDecorator
+import androidx.navigation3.scene.Scene
+import androidx.navigation3.scene.SceneDecoratorStrategy
+import androidx.navigation3.scene.SceneDecoratorStrategyScope
 import androidx.navigation3.ui.NavDisplay
 import androidx.window.core.layout.WindowSizeClass
 import com.github739c1ae2.focuslock.ui.navigation.AppRoute
@@ -120,6 +123,9 @@ fun MainApp() {
                 rememberSaveableStateHolderNavEntryDecorator(),
                 rememberViewModelStoreNavEntryDecorator(),
                 rememberResultEventBusNavEntryDecorator()
+            ),
+            sceneDecoratorStrategies = listOf(
+                rememberBackInterceptionSceneDecoratorStrategy(navigator)
             ),
             entryProvider = entryProvider {
                 entry<AppRoute.Home> {
@@ -322,11 +328,50 @@ fun MainApp() {
                 }
             )
         }
-
-
-        BackHandler(enabled = navigationState.isTopRouteDirty) {
-            navigator.safeGoBack(null)
-        }
-
     }
+}
+
+@Composable
+fun rememberBackInterceptionSceneDecoratorStrategy(navigator: Navigator): BackInterceptionSceneDecoratorStrategy {
+    return remember(navigator) {
+        BackInterceptionSceneDecoratorStrategy(navigator)
+    }
+}
+
+data class BackInterceptionScene(
+    private val scene: Scene<NavKey>,
+    private val navigator: Navigator
+) : Scene<NavKey> {
+    override val key = scene.key
+    override val entries = scene.entries
+    override val previousEntries = scene.previousEntries
+
+    override val content = @Composable {
+        scene.content()
+        val isTopScene = entries.size + previousEntries.size == navigator.state.backStack.size
+        val count = entries.size
+        val enabled = if (isTopScene) {
+            val isDirty by remember(navigator.state.dirtyKeys) {
+                derivedStateOf {
+                    navigator.state.isTopRoutesDirty(count)
+                }
+            }
+            isDirty
+        } else {
+            false
+        }
+        BackHandler(enabled) {
+            navigator.safeGoBackMultiple(count)
+        }
+    }
+
+}
+
+class BackInterceptionSceneDecoratorStrategy(private val navigator: Navigator) : SceneDecoratorStrategy<NavKey> {
+    override fun SceneDecoratorStrategyScope<NavKey>.decorateScene(
+        scene: Scene<NavKey>
+    ): Scene<NavKey> {
+        return BackInterceptionScene(scene, navigator)
+    }
+
 }
