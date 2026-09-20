@@ -243,7 +243,9 @@ class LockEngine(
 
         if (oldSession == null) {
             // 之前没有 Session，说明是从空闲状态进入了 Session，需要启动警告倒计时
-            startWarningCountdown(15.seconds)
+            val duration = (session.startTimeMillis + 15000 - System.currentTimeMillis())
+                .coerceIn(3000, 15000)
+            startWarningCountdown(duration.milliseconds)
         }
     }
 
