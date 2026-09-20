@@ -58,7 +58,7 @@ class BiliAdapter(
         )
 
         override fun canHandle(packageName: String): Boolean {
-            return packageName == "tv.danmaku.bili"
+            return packageName == "tv.danmaku.bili" || packageName == "tv.danmaku.bilibilihd"
         }
 
         override fun create(config: Map<String, ConfigValue>): BiliAdapter {
@@ -76,18 +76,17 @@ class BiliAdapter(
     private val isUpExactMatch = config.getString("up_match_rule", "contains") == "exact"
     private val isComboAnd = config.getString("combo_rule", "or") == "and"
 
+    private var packageName: String = "tv.danmaku.bili"
+
     // b站全屏播放时不会提供任何信息（有播放控件时可能会有视频标题，但那是分P的标题，不是总标题）
     // 因此我们只能缓存下来
     private var currentAuthor: String? = null
     private var currentTitle: String? = null
 
-    sealed interface ScreenData {
-        object FullScreen : ScreenData
-        data class Detail(val author: String, val title: String) : ScreenData
-        data class FullScreenComplete(val author: String) : ScreenData
-    }
+    data class ScreenData(val author: String?, val title: String?)
 
     override fun onAttach(packageName: String) {
+        this.packageName = packageName
     }
 
     override fun onDetach() {
@@ -99,8 +98,13 @@ class BiliAdapter(
         activityName: String?,
         rootNode: AccessibilityNodeInfo?
     ) {
+        if (upUsers.isEmpty() && titleKeywords.isEmpty()) {
+            currentLockState = AdapterLockState.PASS
+            requiresContentUpdate = false
+            return
+        }
         val isDetail = activityName?.endsWith("UnitedBizDetailsActivity")
-            ?: (findFirstNodeByViewId(rootNode, "tv.danmaku.bili:id/video_container") != null)
+            ?: (findFirstNodeByViewId(rootNode, "${packageName}:id/video_container") != null)
         if (!isDetail) {
             currentAuthor = null
             currentTitle = null
@@ -108,28 +112,20 @@ class BiliAdapter(
             requiresContentUpdate = false
             return
         }
-        when (val result = extractScreen(rootNode)) {
-            is ScreenData.FullScreen -> {
-                // 继续使用之前的缓存
+        extractScreen(rootNode).let { result ->
+            if (result.author == null) {
+                // UP主信息更容易获取，如果连 UP主都获取不到，那就说明失败了（如全屏播放时）
+                return@let
             }
-
-            is ScreenData.Detail -> {
-                if (result.author != currentAuthor) {
-                    currentTitle = null
-                }
-                if (result.title.isNotEmpty()) {
-                    currentTitle = result.title
-                }
-                currentAuthor = result.author
+            if (result.author != currentAuthor) {
+                currentTitle = null
             }
-
-            is ScreenData.FullScreenComplete -> {
-                if (result.author != currentAuthor) {
-                    currentTitle = null
-                }
-                currentAuthor = result.author
+            if (result.title?.isNotEmpty() == true) {
+                currentTitle = result.title
             }
+            currentAuthor = result.author
         }
+
         currentLockState = decide()
         requiresContentUpdate = true
     }
@@ -160,24 +156,24 @@ class BiliAdapter(
     }
 
     private fun extractScreen(rootNode: AccessibilityNodeInfo?): ScreenData {
-        var author =
-            findFirstNodeByViewId(rootNode, "tv.danmaku.bili:id/author_name")?.text?.toString()
-        if (author == null) {
-            // 全屏但视频完成时，没有 author_name，当前视频的UP主是 name，推荐视频的是 author
-            author = findFirstNodeByViewId(rootNode, "tv.danmaku.bili:id/name")?.text?.toString()
-            return if (author != null) {
-                ScreenData.FullScreenComplete(author)
-            } else {
-                ScreenData.FullScreen
-            }
+        val detail = findFirstNodeByViewId(rootNode, "${packageName}:id/pager")
+        if (detail != null) {
+            val author =
+                findFirstNodeByViewId(rootNode, "${packageName}:id/author_name")?.text?.toString()
+            // 详情页下，第一个通常是主标题
+            val title = findFirstNodeByViewId(detail, "${packageName}:id/title")
+            val text = title?.text?.toString().orEmpty()
+            val contentDesc = title?.contentDescription?.toString().orEmpty()
+            return ScreenData(author, "$contentDesc $text".trim())
         }
 
-        // 详情页下，第一个通常是主标题
-        val title = findFirstNodeByViewId(rootNode, "tv.danmaku.bili:id/title")
-        val text = title?.text?.toString().orEmpty()
-        val contentDesc = title?.contentDescription?.toString().orEmpty()
-        return ScreenData.Detail(author, "$contentDesc $text".trim())
+        // 全屏但视频完成时，通常没有 author_name，当前视频的UP主是 name，推荐视频的是 author，
+        // 如果再找不到那就只能说明是全屏播放无控件状态了，什么都没有，我们也无能为力
+        val author =
+            findFirstNodeByViewId(rootNode, "${packageName}:id/name")?.text?.toString()
+        return ScreenData(author, null)
     }
+
 
     private fun findFirstNodeByViewId(
         rootNode: AccessibilityNodeInfo?,
