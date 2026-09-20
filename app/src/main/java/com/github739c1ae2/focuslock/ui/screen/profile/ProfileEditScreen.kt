@@ -49,6 +49,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.dropUnlessResumed
 import coil3.compose.AsyncImage
@@ -108,9 +109,11 @@ fun ProfileEditScreen(
             TopAppBar(
                 title = {
                     Text(
-                        stringResource(
+                        text = stringResource(
                             R.string.edit
-                        )
+                        ),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 },
                 navigationIcon = {
@@ -132,6 +135,12 @@ fun ProfileEditScreen(
                                 tint = MaterialTheme.colorScheme.error
                             )
                         }
+                    }
+                    TextButton(
+                        onClick = viewModel::load,
+                        enabled = state.isDirty
+                    ) {
+                        Text(stringResource(R.string.reset))
                     }
                     val valid = (state as? UiState.Loaded)?.profile?.isValid ?: false
                     TextButton(

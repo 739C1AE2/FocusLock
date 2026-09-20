@@ -35,7 +35,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -47,6 +46,8 @@ import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -72,7 +73,13 @@ fun HomeScreen(
     Scaffold(
         modifier = modifier,
         topBar = {
-            TopAppBar(title = { Text(stringResource(R.string.home_title)) })
+            TopAppBar(title = {
+                Text(
+                    text = stringResource(R.string.home_title),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            })
         },
     ) { padding ->
         Column(
@@ -233,13 +240,15 @@ fun StartButton(
                     fontWeight = FontWeight.Black
                 )
                 Text(
-                    text = when(serviceState) {
+                    text = when (serviceState) {
                         EngineServiceState.Idle -> {
                             stringResource(R.string.start_quick_lock)
                         }
+
                         EngineServiceState.Stopped -> {
                             stringResource(R.string.service_not_available)
                         }
+
                         EngineServiceState.InSession -> {
                             stringResource(R.string.lock_in_progress)
                         }
@@ -280,6 +289,7 @@ fun QuickLockConfigPanel(
                 value = selectedName,
                 onValueChange = {},
                 readOnly = true,
+                singleLine = true,
                 label = { Text(stringResource(R.string.profile_binding)) },
                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
                 colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
@@ -336,11 +346,7 @@ fun QuickLockConfigPanel(
     }
     if (showCustomDialog) {
         var inputText by remember { mutableStateOf("") }
-        val isError by remember {
-            derivedStateOf {
-                inputText.toIntOrNull()?.let { it !in 1..1440 } ?: true
-            }
-        }
+        val isError = inputText.toIntOrNull()?.let { it !in 1..1440 } ?: true
         InputDialog(
             title = stringResource(R.string.custom_quick_lock_minutes),
             label = stringResource(R.string.custom_quick_lock_label),
@@ -356,7 +362,8 @@ fun QuickLockConfigPanel(
                 onSelectMinutes(inputText.toInt())
                 showCustomDialog = false
             },
-            onDismiss = { showCustomDialog = false }
+            onDismiss = { showCustomDialog = false },
+            keyboardType = KeyboardType.Number
         )
     }
 }

@@ -26,6 +26,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.dropUnlessResumed
 import com.github739c1ae2.focuslock.R
@@ -40,7 +41,13 @@ fun SettingsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(text = stringResource(R.string.settings_title)) }
+                title = {
+                    Text(
+                        text = stringResource(R.string.settings_title),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             )
         }
     ) { padding ->
@@ -93,10 +100,20 @@ private fun SettingsItem(
             .clickable(onClick = dropUnlessResumed { onClick() }),
         colors = settingsItemColors(selected),
         headlineContent = {
-            Text(title)
+            Text(
+                text = title,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
         },
         supportingContent = summary?.let {
-            { Text(it) }
+            {
+                Text(
+                    text = it,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         },
         leadingContent = icon?.let {
             {

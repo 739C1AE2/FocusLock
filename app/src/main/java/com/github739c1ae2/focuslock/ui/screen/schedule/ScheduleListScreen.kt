@@ -30,6 +30,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLocale
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -62,7 +63,13 @@ fun ScheduleListScreen(
     Scaffold(
         modifier = modifier,
         topBar = {
-            TopAppBar(title = { Text(stringResource(R.string.schedule_list_title)) })
+            TopAppBar(title = {
+                Text(
+                    text = stringResource(R.string.schedule_list_title),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            })
         },
         floatingActionButton = {
             FloatingActionButton(onClick = { showCreateDialog = true }) {
@@ -158,11 +165,15 @@ private fun ScheduleCard(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = schedule.schedule.name,
-                    style = MaterialTheme.typography.titleMedium
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
                 Text(
                     text = "${schedule.schedule.startMinute.minutesToClockString()} - ${schedule.schedule.endMinute.minutesToClockString()}",
-                    style = MaterialTheme.typography.bodyMedium
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
 
                 Text(
@@ -188,6 +199,8 @@ private fun ScheduleCard(
                         append(" · ")
                         append(schedule.profileName)
                     },
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

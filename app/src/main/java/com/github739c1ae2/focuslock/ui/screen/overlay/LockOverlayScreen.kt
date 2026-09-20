@@ -16,7 +16,6 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Android
 import androidx.compose.material3.AlertDialog
@@ -25,7 +24,6 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -56,6 +54,7 @@ import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import com.github739c1ae2.focuslock.R
 import com.github739c1ae2.focuslock.engine.OVERLAY_WINDOW_TYPE
+import com.github739c1ae2.focuslock.ui.components.InputDialog
 import com.github739c1ae2.focuslock.util.AppIconRequest
 import com.github739c1ae2.focuslock.util.timestampMillisToClockString
 import kotlinx.coroutines.delay
@@ -251,50 +250,26 @@ fun DurationInputDialog(
     val inputVal = text.toIntOrNull()
     val isError = text.isNotEmpty() && (inputVal == null || inputVal !in minSeconds..maxSeconds)
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(title) },
-        text = {
-            Column {
-                OutlinedTextField(
-                    value = text,
-                    onValueChange = { newValue ->
-                        if (newValue.all { it.isDigit() }) {
-                            text = newValue
-                        }
-                    },
-                    label = { Text(stringResource(R.string.text_field_label_input_seconds)) },
-                    supportingText = {
-                        Text(
-                            stringResource(
-                                R.string.text_field_supporting_text_duration_range_seconds,
-                                minSeconds,
-                                maxSeconds
-                            )
-                        )
-                    },
-                    isError = isError,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
+    InputDialog(
+        title = title,
+        value = text,
+        onValueChange = { newValue ->
+            if (newValue.all { it.isDigit() }) {
+                text = newValue
             }
         },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    inputVal?.let { onConfirm(it.seconds) }
-                },
-                enabled = text.isNotEmpty() && !isError
-            ) {
-                Text(stringResource(android.R.string.ok))
-            }
+        onConfirm = {
+            inputVal?.let { onConfirm(it.seconds) }
         },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(android.R.string.cancel))
-            }
-        },
+        onDismiss = onDismiss,
+        label = stringResource(R.string.text_field_label_input_seconds),
+        supportingText = stringResource(
+            R.string.text_field_supporting_text_duration_range_seconds,
+            minSeconds,
+            maxSeconds
+        ),
+        isError = isError,
+        keyboardType = KeyboardType.Number,
         properties = DialogProperties(
             windowType = OVERLAY_WINDOW_TYPE
         )

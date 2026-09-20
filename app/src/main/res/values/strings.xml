@@ -120,4 +120,5 @@
     <string name="settings_licenses_title">许可证信息</string>
     <string name="settings_licenses_summary">查看使用的第三方库的许可证信息</string>
     <string name="back">返回</string>
+    <string name="reset">重置</string>
 </resources>

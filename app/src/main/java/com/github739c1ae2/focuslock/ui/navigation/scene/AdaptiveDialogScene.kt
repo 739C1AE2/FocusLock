@@ -31,6 +31,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.dropUnlessResumed
@@ -169,7 +170,13 @@ fun AdaptiveDialogScaffold(
         Scaffold(
             topBar = {
                 TopAppBar(
-                    title = { Text(title) },
+                    title = {
+                        Text(
+                            text = title,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    },
                     navigationIcon = {
                         IconButton(onClick = dropUnlessResumed { onClose() }) {
                             Icon(Icons.Default.Close, contentDescription = dismissText)

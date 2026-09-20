@@ -5,10 +5,13 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.VerticalDragHandle
 import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfoV2
 import androidx.compose.material3.adaptive.navigation3.ListDetailSceneStrategy
@@ -22,10 +25,12 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
+import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.runtime.result.LocalResultEventBus
@@ -74,6 +79,20 @@ fun MainApp() {
     )
     val activity = LocalActivity.current!!
     val navigator = remember(navigationState) { Navigator(navigationState, activity) }
+    val listDetailStrategy: ListDetailSceneStrategy<NavKey> =  rememberListDetailSceneStrategy(
+        paneExpansionDragHandle = { state ->
+            val interactionSource = remember { MutableInteractionSource() }
+            VerticalDragHandle(
+                modifier =
+                    Modifier.paneExpansionDraggable(
+                        state,
+                        LocalMinimumInteractiveComponentSize.current,
+                        interactionSource,
+                    ),
+                interactionSource = interactionSource,
+            )
+        }
+    )
     val scaffoldState = rememberNavigationSuiteScaffoldState()
 
     val windowAdaptiveInfo = currentWindowAdaptiveInfoV2()
@@ -117,7 +136,7 @@ fun MainApp() {
                 navigator.forceGoBack(null)
             },
             sceneStrategies = listOf(
-                rememberListDetailSceneStrategy(),
+                listDetailStrategy,
                 rememberAdaptiveDialogSceneStrategy()
             ),
             entryDecorators = listOf(

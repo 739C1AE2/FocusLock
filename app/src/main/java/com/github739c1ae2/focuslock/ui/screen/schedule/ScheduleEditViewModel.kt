@@ -9,6 +9,9 @@ import com.github739c1ae2.focuslock.database.ScheduleEntity
 import com.github739c1ae2.focuslock.util.FormDraft
 import com.github739c1ae2.focuslock.util.UiText
 import com.github739c1ae2.focuslock.util.ValidatedField
+import dagger.assisted.Assisted
+import dagger.assisted.AssistedFactory
+import dagger.assisted.AssistedInject
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -19,7 +22,6 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.DayOfWeek
-import javax.inject.Inject
 
 data class ScheduleDraft(
     val id: Long,
@@ -88,9 +90,10 @@ sealed class UiEvent {
     data class ProfileCreated(val profileId: Long) : UiEvent()
 }
 
-@HiltViewModel
-class ScheduleEditViewModel @Inject constructor(
-    private val repository: LockRepository
+@HiltViewModel(assistedFactory = ScheduleEditViewModel.Factory::class)
+class ScheduleEditViewModel @AssistedInject constructor(
+    private val repository: LockRepository,
+    @Assisted private val scheduleId: Long
 ) : ViewModel() {
 
     val scheduleState: StateFlow<ScheduleState>
@@ -107,7 +110,11 @@ class ScheduleEditViewModel @Inject constructor(
             initialValue = emptyList()
         )
 
-    fun load(scheduleId: Long) {
+    init {
+        load()
+    }
+
+    fun load() {
         viewModelScope.launch {
             val schedule = repository.getScheduleById(scheduleId)
             if (schedule != null) {
@@ -161,5 +168,10 @@ class ScheduleEditViewModel @Inject constructor(
             scheduleState.value = ScheduleState.Failed
             eventFlow.emit(UiEvent.ScheduleDeleted)
         }
+    }
+
+    @AssistedFactory
+    interface Factory {
+        fun create(scheduleId: Long): ScheduleEditViewModel
     }
 }

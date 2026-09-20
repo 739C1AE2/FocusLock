@@ -111,6 +111,10 @@ class ProfileEditViewModel @AssistedInject constructor(
         field = MutableSharedFlow<UiEvent>()
 
     init {
+        load()
+    }
+
+    fun load() {
         viewModelScope.launch {
             val config = repository.getCompleteProfile(profileId)
             val pm = context.packageManager

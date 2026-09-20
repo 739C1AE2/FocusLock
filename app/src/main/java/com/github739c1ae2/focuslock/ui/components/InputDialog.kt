@@ -11,6 +11,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.window.DialogProperties
 
 @Composable
 fun InputDialog(
@@ -27,6 +29,9 @@ fun InputDialog(
     dismissText: String = stringResource(android.R.string.cancel),
     singleLine: Boolean = true,
     isError: Boolean = false,
+    allowEmpty: Boolean = false,
+    keyboardType: KeyboardType = KeyboardType.Unspecified,
+    properties: DialogProperties = DialogProperties()
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -51,6 +56,7 @@ fun InputDialog(
                     { Text(it) }
                 },
                 keyboardOptions = KeyboardOptions(
+                    keyboardType = keyboardType,
                     imeAction = if (singleLine) {
                         ImeAction.Done
                     } else {
@@ -68,8 +74,12 @@ fun InputDialog(
         },
         confirmButton = {
             TextButton(
-                onClick = onConfirm,
-                enabled = !isError
+                onClick = {
+                    if (!isError && (allowEmpty || value.isNotEmpty())) {
+                        onConfirm()
+                    }
+                },
+                enabled = !isError && (allowEmpty || value.isNotEmpty())
             ) {
                 Text(confirmText)
             }
@@ -80,6 +90,7 @@ fun InputDialog(
             ) {
                 Text(dismissText)
             }
-        }
+        },
+        properties = properties
     )
 }
