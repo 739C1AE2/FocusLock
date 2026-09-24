@@ -22,8 +22,6 @@ import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.launch
 
 
-const val OVERLAY_WINDOW_TYPE = WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
-
 class OverlayManager(private val context: Context, private val lockEngine: LockEngine) {
 
     companion object {
@@ -39,6 +37,8 @@ class OverlayManager(private val context: Context, private val lockEngine: LockE
         OverlayViewModelEntryPoint::class.java
     )
     private val assistedFactory = entryPoint.getOverlayViewModelFactory()
+
+    private var currentOverlayWindowType = WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
 
     private val viewModelFactory = object : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
@@ -58,7 +58,7 @@ class OverlayManager(private val context: Context, private val lockEngine: LockE
 
     private var overlayState = OverlayWindowState.NOT_CREATED
     private val layoutParams = WindowManager.LayoutParams().apply {
-        type = OVERLAY_WINDOW_TYPE
+        type = currentOverlayWindowType
         format = PixelFormat.TRANSLUCENT
         gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
     }
@@ -106,6 +106,18 @@ class OverlayManager(private val context: Context, private val lockEngine: LockE
                 .collect { state ->
                     updateWindowFlags(state)
                 }
+        }
+
+        lockEngine.engineScope.launch(Dispatchers.Main) {
+            lockEngine.overlayWindowType.collect { newType ->
+                if (newType != currentOverlayWindowType) {
+                    currentOverlayWindowType = newType
+                    layoutParams.type = newType
+                    if (overlayState == OverlayWindowState.SHOWN) {
+                        windowManager.updateViewLayout(composeView, layoutParams)
+                    }
+                }
+            }
         }
     }
 

@@ -76,6 +76,8 @@ class OverlayViewModel @AssistedInject constructor(
             initialValue = OverlayState.Hidden
         )
 
+    val overlayWindowType: StateFlow<Int> = lockEngine.overlayWindowType
+
     val allowedApps: StateFlow<AllowedAppListState> = lockEngine.engineState
         .filterIsInstance<EngineState.InSession>()
         .map { it.session.profileId }

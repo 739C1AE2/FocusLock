@@ -1,5 +1,6 @@
 package com.github739c1ae2.focuslock.ui.screen.overlay
 
+import android.view.WindowManager
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -29,8 +30,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -53,7 +56,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import com.github739c1ae2.focuslock.R
-import com.github739c1ae2.focuslock.engine.OVERLAY_WINDOW_TYPE
 import com.github739c1ae2.focuslock.ui.components.InputDialog
 import com.github739c1ae2.focuslock.util.AppIconRequest
 import com.github739c1ae2.focuslock.util.timestampMillisToClockString
@@ -62,22 +64,31 @@ import java.time.format.FormatStyle
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
+
+val LocalOverlayWindowType = compositionLocalOf { WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY }
+
 @Composable
 fun LockOverlayScreen(
     viewModel: OverlayViewModel
 ) {
     val state by viewModel.overlayState.collectAsStateWithLifecycle()
-    when (val state = state) {
-        is OverlayState.Locked -> {
-            LockedScreen(state, viewModel)
-        }
+    val overlayWindowType by viewModel.overlayWindowType.collectAsStateWithLifecycle()
 
-        is OverlayState.Warning -> {
-            WarningScreen(state)
-        }
+    CompositionLocalProvider(
+        LocalOverlayWindowType provides overlayWindowType
+    ) {
+        when (val state = state) {
+            is OverlayState.Locked -> {
+                LockedScreen(state, viewModel)
+            }
 
-        is OverlayState.Hidden -> {
-            // Do nothing
+            is OverlayState.Warning -> {
+                WarningScreen(state)
+            }
+
+            is OverlayState.Hidden -> {
+                // Do nothing
+            }
         }
     }
 }
@@ -271,7 +282,7 @@ fun DurationInputDialog(
         isError = isError,
         keyboardType = KeyboardType.Number,
         properties = DialogProperties(
-            windowType = OVERLAY_WINDOW_TYPE
+            windowType = LocalOverlayWindowType.current
         )
     )
 }
@@ -318,7 +329,7 @@ fun CountDownConfirmDialog(
             }
         },
         properties = DialogProperties(
-            windowType = OVERLAY_WINDOW_TYPE
+            windowType = LocalOverlayWindowType.current
         )
     )
 }

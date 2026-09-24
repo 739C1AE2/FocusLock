@@ -1,5 +1,6 @@
 package com.github739c1ae2.focuslock
 
+import android.app.ActivityManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.LocalActivity
@@ -29,6 +30,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
@@ -38,6 +40,7 @@ import androidx.navigation3.runtime.result.ResultEffect
 import androidx.navigation3.runtime.result.rememberResultEventBusNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
 import androidx.window.core.layout.WindowSizeClass
+import com.github739c1ae2.focuslock.datastore.AppSettingsManager
 import com.github739c1ae2.focuslock.ui.navigation.AppRoute
 import com.github739c1ae2.focuslock.ui.navigation.NAV_ITEMS
 import com.github739c1ae2.focuslock.ui.navigation.Navigator
@@ -57,12 +60,29 @@ import com.github739c1ae2.focuslock.ui.screen.settings.LicensesScreen
 import com.github739c1ae2.focuslock.ui.screen.settings.SettingsScreen
 import com.github739c1ae2.focuslock.ui.theme.FocusLockTheme
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.launch
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+
+    @Inject
+    lateinit var settingsManager: AppSettingsManager
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        lifecycleScope.launch {
+            settingsManager.hideFromRecentsEnabled.collect { hideFromRecents ->
+                val activityManager = getSystemService(ACTIVITY_SERVICE) as? ActivityManager
+                val appTasks = activityManager?.appTasks
+                if (!appTasks.isNullOrEmpty()) {
+                    appTasks[0].setExcludeFromRecents(hideFromRecents)
+                }
+            }
+        }
+
         setContent {
             FocusLockTheme {
                 MainApp()

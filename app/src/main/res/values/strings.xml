@@ -121,4 +121,10 @@
     <string name="settings_licenses_summary">查看使用的第三方库的许可证信息</string>
     <string name="back">返回</string>
     <string name="reset">重置</string>
+    <string name="settings_section_app_lifecycle">保活</string>
+    <string name="settings_hide_from_recents_title">隐藏后台</string>
+    <string name="settings_hide_from_recents_summary">将应用从最近任务界面隐藏，启用前需提前在最近任务界面把应用锁定</string>
+    <string name="settings_use_application_overlay_title">使用普通悬浮窗</string>
+    <string name="settings_use_application_overlay_summary">创建普通悬浮窗而非无障碍悬浮窗，此功能需要悬浮窗权限</string>
+    <string name="settings_section_general">常规</string>
 </resources>

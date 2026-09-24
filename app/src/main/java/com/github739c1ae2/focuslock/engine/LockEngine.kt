@@ -1,7 +1,10 @@
 package com.github739c1ae2.focuslock.engine
 
 import android.accessibilityservice.AccessibilityService
+import android.os.Build
+import android.provider.Settings
 import android.util.Log
+import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import androidx.collection.LruCache
@@ -12,6 +15,7 @@ import com.github739c1ae2.focuslock.adapter.StaticAdapter
 import com.github739c1ae2.focuslock.database.ActiveLockSession
 import com.github739c1ae2.focuslock.database.AppRuleMode
 import com.github739c1ae2.focuslock.database.LockRepository
+import com.github739c1ae2.focuslock.datastore.AppSettingsManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -40,7 +44,8 @@ import kotlin.time.Duration.Companion.seconds
 @Suppress("RunBlocking")
 class LockEngine(
     private val service: AccessibilityService,
-    private val repository: LockRepository
+    private val repository: LockRepository,
+    settingsManager: AppSettingsManager
 ) {
     companion object {
         private const val TAG = "LockEngine"
@@ -82,6 +87,24 @@ class LockEngine(
 
     private val overlayManager: OverlayManager = OverlayManager(service, this)
 
+    val overlayWindowType: StateFlow<Int> = settingsManager.useApplicationOverlayEnabled
+        .map { useApplicationOverlay ->
+            if (useApplicationOverlay && Settings.canDrawOverlays(service)) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+                } else {
+                    @Suppress("DEPRECATION")
+                    WindowManager.LayoutParams.TYPE_PHONE
+                }
+            } else {
+                WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
+            }
+        }
+        .stateIn(
+            scope = engineScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
+        )
 
     private val systemAppCache = LruCache<String, Boolean>(20)
 
