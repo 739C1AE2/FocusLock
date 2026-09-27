@@ -16,6 +16,7 @@ import com.github739c1ae2.focuslock.database.ActiveLockSession
 import com.github739c1ae2.focuslock.database.AppRuleMode
 import com.github739c1ae2.focuslock.database.LockRepository
 import com.github739c1ae2.focuslock.datastore.AppSettingsManager
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -45,7 +46,8 @@ import kotlin.time.Duration.Companion.seconds
 class LockEngine(
     private val service: AccessibilityService,
     private val repository: LockRepository,
-    settingsManager: AppSettingsManager
+    settingsManager: AppSettingsManager,
+    private val onError: (Throwable) -> Unit
 ) {
     companion object {
         private const val TAG = "LockEngine"
@@ -65,11 +67,15 @@ class LockEngine(
             )
     }
 
+    private val exceptionHandler = CoroutineExceptionHandler { _, throwable ->
+        onError(throwable)
+    }
+
     val engineState: StateFlow<EngineState>
         field = MutableStateFlow<EngineState>(EngineState.Idle)
 
     private val engineDispatcher = Dispatchers.Default.limitedParallelism(1)
-    val engineScope = CoroutineScope(engineDispatcher + SupervisorJob())
+    val engineScope = CoroutineScope(engineDispatcher + SupervisorJob() + exceptionHandler)
 
     private var countdownJob: Job? = null
     private var timeTriggerJob: Job? = null
@@ -114,7 +120,7 @@ class LockEngine(
         _runningStateFlow.value = engineState
         engineScope.launch {
             repository.invalidationTracker
-                .createFlow("schedules", "quick_lock", emitInitialState = false)
+                .createFlow("schedules", "quick_lock", emitInitialState = true)
                 .collect {
                     Log.d(TAG, "数据库发生变化，重新评估当前状态")
                     evaluateCurrentState()
@@ -137,8 +143,8 @@ class LockEngine(
             }
 
             AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED -> {
-                Log.d(TAG, "收到窗口内容变化事件")
                 if (activeAdapter.requiresContentUpdate) {
+                    Log.d(TAG, "收到窗口内容变化事件")
                     throttler.request(200.milliseconds)
                 }
             }

@@ -5,6 +5,7 @@ import android.provider.Settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.github739c1ae2.focuslock.datastore.AppSettingsManager
+import com.github739c1ae2.focuslock.guard.AccessibilityGuard
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.SharedFlow
@@ -17,11 +18,13 @@ import javax.inject.Inject
 
 data class SettingsUiState(
     val useApplicationOverlay: Boolean = false,
-    val hideFromRecents: Boolean = false
+    val hideFromRecents: Boolean = false,
+    val autoEnableAccessibility: Boolean = false
 )
 
 sealed interface SettingsUiEvent {
     object RequestSystemAlertWindowPermission : SettingsUiEvent
+    object RequestWriteSecureSettingsPermission : SettingsUiEvent
 }
 
 @HiltViewModel
@@ -33,12 +36,14 @@ class SettingsViewModel @Inject constructor(
     val uiState: StateFlow<SettingsUiState> =
         combine(
             settingsManager.useApplicationOverlayEnabled,
-            settingsManager.hideFromRecentsEnabled
-        ) { useApplicationOverlay, hideFromRecents ->
+            settingsManager.hideFromRecentsEnabled,
+            settingsManager.autoEnableAccessibilityEnabled
+        ) { useApplicationOverlay, hideFromRecents, autoEnableAccessibility ->
 
             SettingsUiState(
                 useApplicationOverlay = useApplicationOverlay && Settings.canDrawOverlays(context),
-                hideFromRecents = hideFromRecents
+                hideFromRecents = hideFromRecents,
+                autoEnableAccessibility = autoEnableAccessibility
             )
 
         }.stateIn(
@@ -56,13 +61,27 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    fun toggleUseApplicationOverlay(enabled: Boolean) {
+    fun toggleUseApplicationOverlay(enabled: Boolean, emitRequest: Boolean = true) {
         viewModelScope.launch {
             if (enabled && !Settings.canDrawOverlays(context)) {
-                eventFlow.emit(SettingsUiEvent.RequestSystemAlertWindowPermission)
+                if (emitRequest) {
+                    eventFlow.emit(SettingsUiEvent.RequestSystemAlertWindowPermission)
+                }
                 return@launch
             }
             settingsManager.setUseApplicationOverlay(enabled)
+        }
+    }
+
+    fun toggleAutoEnableAccessibility(enabled: Boolean, emitRequest: Boolean = true) {
+        viewModelScope.launch {
+            if (enabled && !AccessibilityGuard.hasWriteSecureSettingsPermission()) {
+                if (emitRequest) {
+                    eventFlow.emit(SettingsUiEvent.RequestWriteSecureSettingsPermission)
+                }
+                return@launch
+            }
+            settingsManager.setAutoEnableAccessibility(enabled)
         }
     }
 

@@ -1,5 +1,6 @@
 package com.github739c1ae2.focuslock.ui.screen.settings
 
+import android.content.ClipData
 import android.content.Intent
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -10,34 +11,48 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.outlined.LibraryBooks
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.outlined.AccessibilityNew
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material.icons.outlined.Window
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.contentColorFor
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -48,6 +63,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.compose.dropUnlessResumed
 import com.github739c1ae2.focuslock.R
 import com.github739c1ae2.focuslock.ui.navigation.AppRoute
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -61,10 +77,12 @@ fun SettingsScreen(
         contract = ActivityResultContracts.StartActivityForResult()
     ) {
         if (Settings.canDrawOverlays(context)) {
-            viewModel.toggleUseApplicationOverlay(true)
+            viewModel.toggleUseApplicationOverlay(true, emitRequest = false)
         }
     }
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+
+    var showWriteSecureSettingsDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         viewModel.eventFlow.collect { event ->
@@ -75,6 +93,10 @@ fun SettingsScreen(
                         "package:${context.packageName}".toUri()
                     )
                     requestOverlayLauncher.launch(intent)
+                }
+
+                SettingsUiEvent.RequestWriteSecureSettingsPermission -> {
+                    showWriteSecureSettingsDialog = true
                 }
             }
         }
@@ -101,7 +123,67 @@ fun SettingsScreen(
             state = state,
             onNavigateTo = onNavigateTo,
             onToggleUseApplicationOverlay = viewModel::toggleUseApplicationOverlay,
-            onToggleHideFromRecents = viewModel::toggleHideFromRecents
+            onToggleHideFromRecents = viewModel::toggleHideFromRecents,
+            onToggleAutoEnableAccessibility = viewModel::toggleAutoEnableAccessibility
+        )
+    }
+
+    if (showWriteSecureSettingsDialog) {
+        val clipboard = LocalClipboard.current
+        val scope = rememberCoroutineScope()
+        val cmd = "adb shell pm grant ${context.packageName} android.permission.WRITE_SECURE_SETTINGS"
+        AlertDialog(
+            onDismissRequest = { showWriteSecureSettingsDialog = false },
+            title = { Text(stringResource(R.string.write_secure_settings_permission_required)) },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(stringResource(R.string.write_secure_settings_permission_required_message))
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    IconButton(
+                        onClick = {
+                            scope.launch {
+                                val clipData = ClipData.newPlainText(
+                                    "Command",
+                                    cmd
+                                )
+                                clipboard.setClipEntry(
+                                    ClipEntry(clipData)
+                                )
+                            }
+                        },
+                        modifier = Modifier.align(Alignment.End)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ContentCopy,
+                            contentDescription = stringResource(R.string.copy_to_clipboard)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    SelectionContainer {
+                        Text(
+                            text = cmd,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showWriteSecureSettingsDialog = false
+                        viewModel.toggleAutoEnableAccessibility(true, emitRequest = false)
+                    }
+                ) {
+                    Text(stringResource(android.R.string.ok))
+                }
+            }
         )
     }
 }
@@ -113,7 +195,8 @@ private fun SettingsList(
     state: SettingsUiState,
     onNavigateTo: (AppRoute) -> Unit,
     onToggleUseApplicationOverlay: (Boolean) -> Unit,
-    onToggleHideFromRecents: (Boolean) -> Unit
+    onToggleHideFromRecents: (Boolean) -> Unit,
+    onToggleAutoEnableAccessibility: (Boolean) -> Unit
 ) {
     LazyColumn(
         modifier = modifier,
@@ -140,6 +223,13 @@ private fun SettingsList(
                     summary = stringResource(R.string.settings_hide_from_recents_summary),
                     checked = state.hideFromRecents,
                     onCheckedChange = onToggleHideFromRecents
+                )
+                SettingSwitchItem(
+                    icon = Icons.Outlined.AccessibilityNew,
+                    title = stringResource(R.string.settings_auto_enable_accessibility_title),
+                    summary = stringResource(R.string.settings_auto_enable_accessibility_summary),
+                    checked = state.autoEnableAccessibility,
+                    onCheckedChange = onToggleAutoEnableAccessibility
                 )
             }
         }

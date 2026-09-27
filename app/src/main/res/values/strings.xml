@@ -127,4 +127,11 @@
     <string name="settings_use_application_overlay_title">使用普通悬浮窗</string>
     <string name="settings_use_application_overlay_summary">创建普通悬浮窗而非无障碍悬浮窗，此功能需要悬浮窗权限</string>
     <string name="settings_section_general">常规</string>
+    <string name="settings_auto_enable_accessibility_title">自动启动无障碍（实验性功能）</string>
+    <string name="settings_auto_enable_accessibility_summary">需 adb 授予 WRITE_SECURE_SETTINGS 权限</string>
+    <string name="copy_to_clipboard">复制</string>
+    <string name="write_secure_settings_permission_required">权限不足</string>
+    <string name="write_secure_settings_permission_required_message">请用 adb 连接你的设备，并执行下方命令</string>
+    <string name="engine_error_too_frequent">锁机引擎异常过于频繁，服务暂时关闭</string>
+    <string name="a11y_service_stop_too_frequent">锁机服务频繁中止，请检查是否被系统拦截，无障碍守护将暂时关闭</string>
 </resources>

@@ -16,6 +16,7 @@ class AppSettingsManager @Inject constructor(
     companion object {
         val HIDE_FROM_RECENTS_KEY = booleanPreferencesKey("hide_from_recents")
         val USE_APPLICATION_OVERLAY_KEY = booleanPreferencesKey("use_application_overlay")
+        val AUTO_ENABLE_ACCESSIBILITY_KEY = booleanPreferencesKey("auto_enable_accessibility")
     }
 
     val hideFromRecentsEnabled: Flow<Boolean> = dataStore.data.map { prefs ->
@@ -35,6 +36,16 @@ class AppSettingsManager @Inject constructor(
     suspend fun setUseApplicationOverlay(enabled: Boolean) {
         dataStore.edit { prefs ->
             prefs[USE_APPLICATION_OVERLAY_KEY] = enabled
+        }
+    }
+
+    val autoEnableAccessibilityEnabled: Flow<Boolean> = dataStore.data.map { prefs ->
+        prefs[AUTO_ENABLE_ACCESSIBILITY_KEY] ?: false
+    }
+
+    suspend fun setAutoEnableAccessibility(enabled: Boolean) {
+        dataStore.edit { prefs ->
+            prefs[AUTO_ENABLE_ACCESSIBILITY_KEY] = enabled
         }
     }
 }
