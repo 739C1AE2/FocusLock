@@ -6,6 +6,7 @@ object AdapterFactoryRegistry {
     init {
         register(GenericAdapter.Factory)
         register(BiliAdapter.Factory)
+        register(WeChatAdapter.Factory)
     }
 
     private fun register(factory: AppAdapterFactory<*>) {

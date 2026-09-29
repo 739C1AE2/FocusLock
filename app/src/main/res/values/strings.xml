@@ -134,5 +134,10 @@
     <string name="write_secure_settings_permission_required_message">请用 adb 连接你的设备，并执行下方命令</string>
     <string name="engine_error_too_frequent">锁机引擎异常过于频繁，服务暂时关闭</string>
     <string name="a11y_service_stop_too_frequent">锁机服务频繁中止，请检查是否被系统拦截，无障碍守护将暂时关闭</string>
-    <string name="custom_quick_lock">自定义...</string>
+    <string name="custom_quick_lock">自定义…</string>
+    <string name="app_adapter_name_wechat">微信</string>
+    <string name="app_adapter_desc_wechat">由于微信的限制，目前仅提供 Activity 级别的拦截。支持朋友圈、视频号、小程序拦截</string>
+    <string name="app_adapter_config_title_wechat_block_moments">拦截朋友圈</string>
+    <string name="app_adapter_config_title_wechat_block_channels">拦截视频号</string>
+    <string name="app_adapter_config_title_wechat_block_mini_programs">拦截小程序</string>
 </resources>
