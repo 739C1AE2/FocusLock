@@ -125,9 +125,30 @@ class LockEngine(
         _runningStateFlow.value = engineState
 
         engineScope.launch {
-            for (event in eventChannel) {
+            for (firstEvent in eventChannel) {
                 if (destroyed) break
-                processEvent(event)
+                val batch = mutableListOf(firstEvent)
+                while (true) {
+                    val next = eventChannel.tryReceive().getOrNull() ?: break
+                    batch.add(next)
+                }
+                val deduped = mutableListOf<EngineEvent>()
+                val seenEvents = mutableSetOf<EngineEvent>()
+                for (event in batch.reversed()) {
+                    when (event) {
+                        EngineEvent.ResolveContent, EngineEvent.DatabaseChanged -> {
+                            if (seenEvents.add(event)) {
+                                deduped.add(event)
+                            }
+                        }
+                        else -> {
+                            deduped.add(event)
+                        }
+                    }
+                }
+                for (event in deduped.reversed()) {
+                    processEvent(event)
+                }
             }
         }
 
@@ -185,30 +206,37 @@ class LockEngine(
             is EngineEvent.WindowStateChanged -> {
                 activityCache.put(event.packageName, event.className)
             }
+
             is EngineEvent.ResolveContent -> {
                 resolveCurrentContent()
             }
+
             is EngineEvent.DatabaseChanged -> {
-                evaluateCurrentState()
+                evaluateCurrentState(forceReloadSession = true)
             }
+
             is EngineEvent.ActionRequested -> {
                 when (event.action) {
                     is EngineAction.RequestPause -> handlePauseRequest(event.action.duration)
                     is EngineAction.RequestUnlock -> handleForceUnlock()
                 }
             }
+
             is EngineEvent.WakeupTimeReached -> {
                 val currentSession = (engineState.value as? EngineState.InSession)?.session
                 if (event.expectedSession == null || event.expectedSession == currentSession) {
                     evaluateCurrentState()
                 }
             }
+
             is EngineEvent.WarningTick -> {
                 val state = engineState.value
                 if (state is EngineState.InSession && state.session == event.session && state.sessionState is SessionState.Warning) {
-                    engineState.value = state.copy(sessionState = SessionState.Warning(event.secondsLeft.seconds))
+                    engineState.value =
+                        state.copy(sessionState = SessionState.Warning(event.secondsLeft.seconds))
                 }
             }
+
             is EngineEvent.TimerFinished -> {
                 val state = engineState.value
                 if (state is EngineState.InSession && state.session == event.session) {
@@ -259,29 +287,24 @@ class LockEngine(
         evaluateCurrentState()
     }
 
-    private suspend fun evaluateCurrentState() {
+    private suspend fun evaluateCurrentState(forceReloadSession: Boolean = false) {
         val state = engineState.value
-
-        if (state is EngineState.InSession && state.sessionState is SessionState.Paused) {
-            // 暂停状态下不需要做任何处理，包括更新 session，完成后会被设为 Allowed，从而触发状态更新
-            return
-        }
-        val session = repository.getActiveSession()
-
-        if (session == null) {
-            setIdle()
-            return
-        }
-
         val oldSession = (state as? EngineState.InSession)?.session
-        if (oldSession != session) {
-            changeSession(session, oldSession)
-            // changeSession 只是更新了适配器对象，适配器还不知道当前界面的内容，
-            // 重新解析当前内容，这会更新适配器解析状态
-            resolveCurrentContent()
-            // 当前状态还没准备完毕，直接 return
-            // resolveCurrentContent 会在完成后重新调用 evaluateCurrentState
-            return
+        if (forceReloadSession || oldSession == null || System.currentTimeMillis() >= oldSession.endTimeMillis) {
+            val session = repository.getActiveSession()
+            if (session == null) {
+                setIdle()
+                return
+            }
+            if (oldSession != session) {
+                changeSession(session, oldSession)
+                // changeSession 只是更新了适配器对象，适配器还不知道当前界面的内容，
+                // 重新解析当前内容，这会更新适配器解析状态
+                resolveCurrentContent()
+                // 当前状态还没准备完毕，直接 return
+                // resolveCurrentContent 会在完成后重新调用 evaluateCurrentState
+                return
+            }
         }
 
         // 前面所有的可能更改 sessionState 的分支都提前 return 了，所以 engineState 还没有改变
@@ -363,11 +386,13 @@ class LockEngine(
                 profile.userAppMode == AppRuleMode.BLACKLIST
             }
         }
-        updateAdapterInstance(if (locked) {
-            StaticAdapter.BLOCKED
-        } else {
-            StaticAdapter.PASSED
-        })
+        updateAdapterInstance(
+            if (locked) {
+                StaticAdapter.BLOCKED
+            } else {
+                StaticAdapter.PASSED
+            }
+        )
     }
 
     private fun updateAdapterInstance(newAdapter: AppAdapter) {
