@@ -1,6 +1,8 @@
 package com.github739c1ae2.focuslock.engine
 
 import android.accessibilityservice.AccessibilityService
+import android.content.ComponentName
+import android.content.pm.PackageManager
 import android.os.Build
 import android.provider.Settings
 import android.util.Log
@@ -119,6 +121,7 @@ class LockEngine(
 
     private val systemAppCache = LruCache<String, Boolean>(20)
 
+    private val activityClassCache = LruCache<String, Boolean>(200)
     private val activityCache = LruCache<String, String>(20)
 
     init {
@@ -204,7 +207,9 @@ class LockEngine(
     private suspend fun processEvent(event: EngineEvent) {
         when (event) {
             is EngineEvent.WindowStateChanged -> {
-                activityCache.put(event.packageName, event.className)
+                if (isActivityClass(event.packageName, event.className) == true) {
+                    activityCache.put(event.packageName, event.className)
+                }
             }
 
             is EngineEvent.ResolveContent -> {
@@ -544,5 +549,40 @@ class LockEngine(
             systemAppCache.put(packageName, isSystem)
         }
         return isSystem
+    }
+
+    val viewPackagePrefixes = arrayOf(
+        "android.view.",
+        "android.widget.",
+        "android.webkit.",
+        "android.appwidget.",
+        "android.inputmethodservice.",
+        "androidx.recyclerview.",
+        "androidx.compose.",
+        "com.google.android.material."
+    )
+
+    private fun isActivityClass(packageName: String, className: String): Boolean? {
+        val cacheKey = "$packageName/$className"
+        activityClassCache[cacheKey]?.let { return it }
+        val isActivity = try {
+            service.packageManager.getActivityInfo(ComponentName(packageName, className), 0)
+            true
+        } catch (_: PackageManager.NameNotFoundException) {
+            false
+        } catch (e: Exception) {
+            Log.e(TAG, "Error while checking if $cacheKey is activity", e)
+            if (viewPackagePrefixes.any { className.startsWith(it) }) {
+                false
+            } else if (className.endsWith("Activity")) {
+                true
+            } else {
+                null
+            }
+        }
+        if (isActivity != null) {
+            activityClassCache.put(cacheKey, isActivity)
+        }
+        return isActivity
     }
 }
