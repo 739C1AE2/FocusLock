@@ -65,7 +65,8 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
 
-val LocalOverlayWindowType = compositionLocalOf { WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY }
+val LocalOverlayWindowType =
+    compositionLocalOf { WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY }
 
 @Composable
 fun LockOverlayScreen(
@@ -95,7 +96,9 @@ fun LockOverlayScreen(
 
 @Composable
 fun LockedScreen(state: OverlayState.Locked, viewModel: OverlayViewModel) {
-    val allowedApps by viewModel.allowedApps.collectAsState()
+    val allowedApps by viewModel.allowedApps.collectAsStateWithLifecycle()
+    val remainingPauseSeconds by viewModel.remainingPauseSeconds.collectAsStateWithLifecycle()
+    val remainingForceUnlocks by viewModel.remainingForceUnlocks.collectAsStateWithLifecycle()
     var showPauseDialog by remember { mutableStateOf(false) }
     var showUnlockDialog by remember { mutableStateOf(false) }
     val startTime = state.session.startTimeMillis.timestampMillisToClockString(FormatStyle.MEDIUM)
@@ -185,7 +188,7 @@ fun LockedScreen(state: OverlayState.Locked, viewModel: OverlayViewModel) {
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 Button(
                     onClick = { showPauseDialog = true },
-                    enabled = true, // TODO: 额度校验闭环：没有额度直接变灰！
+                    enabled = remainingPauseSeconds >= 5,
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                 ) {
                     Text(stringResource(R.string.pause))
@@ -193,6 +196,7 @@ fun LockedScreen(state: OverlayState.Locked, viewModel: OverlayViewModel) {
 
                 OutlinedButton(
                     onClick = { showUnlockDialog = true },
+                    enabled = remainingForceUnlocks > 0,
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
                 ) {
                     Text(stringResource(R.string.force_unlock))
@@ -204,7 +208,7 @@ fun LockedScreen(state: OverlayState.Locked, viewModel: OverlayViewModel) {
         DurationInputDialog(
             stringResource(R.string.dialog_title_pause),
             minSeconds = 5,
-            maxSeconds = 180,
+            maxSeconds = remainingPauseSeconds,
             onDismiss = { showPauseDialog = false },
             onConfirm = {
                 viewModel.onRequestPause(it)
@@ -216,7 +220,7 @@ fun LockedScreen(state: OverlayState.Locked, viewModel: OverlayViewModel) {
     if (showUnlockDialog) {
         CountDownConfirmDialog(
             stringResource(R.string.force_unlock),
-            stringResource(R.string.confirm_force_unlock),
+            stringResource(R.string.confirm_force_unlock_fmt, remainingForceUnlocks),
             secondsToWait = 15,
             onDismiss = { showUnlockDialog = false },
             onConfirm = {

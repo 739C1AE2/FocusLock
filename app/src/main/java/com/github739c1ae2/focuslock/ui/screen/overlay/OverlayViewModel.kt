@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import com.github739c1ae2.focuslock.database.ActiveLockSession
 import com.github739c1ae2.focuslock.database.AppRuleMode
 import com.github739c1ae2.focuslock.database.LockRepository
+import com.github739c1ae2.focuslock.datastore.UnlockUsageManager
 import com.github739c1ae2.focuslock.engine.EngineAction
 import com.github739c1ae2.focuslock.engine.EngineState
 import com.github739c1ae2.focuslock.engine.LockEngine
@@ -21,6 +22,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -29,6 +31,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import kotlin.time.Duration
 
 
@@ -52,6 +55,7 @@ sealed interface OverlayState {
 class OverlayViewModel @AssistedInject constructor(
     @ApplicationContext private val context: Context,
     @Assisted private val lockEngine: LockEngine,
+    private val unlockUsageManager: UnlockUsageManager,
     private val repository: LockRepository,
 ) : ViewModel() {
 
@@ -95,6 +99,22 @@ class OverlayViewModel @AssistedInject constructor(
             initialValue = AllowedAppListState.Loaded(emptyList())
         )
 
+    val remainingForceUnlocks: StateFlow<Int>
+        field = MutableStateFlow(0)
+
+    val remainingPauseSeconds: StateFlow<Int> = unlockUsageManager.remainingPauseDurationSeconds
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = UnlockUsageManager.MAX_PAUSE_DURATION_SECONDS_PER_SESSION
+        )
+
+    init {
+        viewModelScope.launch {
+            val remaining = unlockUsageManager.getRemainingForceUnlocks()
+            remainingForceUnlocks.value = remaining
+        }
+    }
 
     suspend fun loadAllowedApps(profileId: Long): List<AllowedAppInfo> {
         val profile = repository.getCompleteProfile(profileId)
@@ -139,10 +159,17 @@ class OverlayViewModel @AssistedInject constructor(
     }
 
     fun onRequestPause(duration: Duration) {
+        viewModelScope.launch {
+            unlockUsageManager.incrementPauseDuration(duration.inWholeSeconds.toInt())
+        }
         lockEngine.onActionReceived(EngineAction.RequestPause(duration))
     }
 
     fun onRequestUnlock() {
+        viewModelScope.launch {
+            unlockUsageManager.incrementForceUnlockCount()
+            remainingForceUnlocks.value = unlockUsageManager.getRemainingForceUnlocks()
+        }
         lockEngine.onActionReceived(EngineAction.RequestUnlock)
     }
 

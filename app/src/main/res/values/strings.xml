@@ -111,7 +111,7 @@
     <string name="pause">暂停</string>
     <string name="force_unlock">紧急解除</string>
     <string name="dialog_title_pause">暂时解除锁定</string>
-    <string name="confirm_force_unlock">确定要紧急解除锁定吗？</string>
+    <string name="confirm_force_unlock_fmt">确定要紧急解除锁定吗？本月你还有 %1$d 次解除机会</string>
     <string name="content_desc_remove_item">删除</string>
     <string name="add_item">添加</string>
     <string name="nav_settings">设置</string>

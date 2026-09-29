@@ -16,6 +16,7 @@ import com.github739c1ae2.focuslock.database.ActiveLockSession
 import com.github739c1ae2.focuslock.database.AppRuleMode
 import com.github739c1ae2.focuslock.database.LockRepository
 import com.github739c1ae2.focuslock.datastore.AppSettingsManager
+import com.github739c1ae2.focuslock.datastore.UnlockUsageManager
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -46,6 +47,7 @@ class LockEngine(
     private val service: AccessibilityService,
     private val repository: LockRepository,
     settingsManager: AppSettingsManager,
+    private val unlockUsageManager: UnlockUsageManager,
     private val onError: (Throwable) -> Unit
 ) {
     companion object {
@@ -320,6 +322,8 @@ class LockEngine(
         scheduleWakeupForSession(session)
         // 将适配器更新为当前时段的
         updateAdapter()
+        // 通知用量统计模块，以重置暂停额度
+        unlockUsageManager.updateSession(session)
 
         if (oldSession == null) {
             // 之前没有 Session，说明是从空闲状态进入了 Session，需要启动警告倒计时

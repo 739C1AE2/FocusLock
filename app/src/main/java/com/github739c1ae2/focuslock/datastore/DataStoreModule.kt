@@ -16,6 +16,10 @@ import javax.inject.Singleton
 @Retention(AnnotationRetention.BINARY)
 annotation class AppSettingsDataStore
 
+@Qualifier
+@Retention(AnnotationRetention.BINARY)
+annotation class UnlockUsageDataStore
+
 private val Context.settingsDataStore by preferencesDataStore(name = "app_settings")
 
 @Module
@@ -26,6 +30,15 @@ object DataStoreModule {
     @Singleton
     @AppSettingsDataStore
     fun provideAppSettingsDataStore(
+        @ApplicationContext context: Context
+    ): DataStore<Preferences> {
+        return context.settingsDataStore
+    }
+
+    @Provides
+    @Singleton
+    @UnlockUsageDataStore
+    fun provideUnlockUsageDataStore(
         @ApplicationContext context: Context
     ): DataStore<Preferences> {
         return context.settingsDataStore
