@@ -104,7 +104,7 @@ class BiliAdapter(
             return
         }
         val isDetail = activityName?.endsWith("UnitedBizDetailsActivity")
-            ?: (findFirstNodeByViewId(rootNode, "${packageName}:id/video_container") != null)
+            ?: (rootNode?.findFirstNodeByViewId("${packageName}:id/video_container") != null)
         if (!isDetail) {
             currentAuthor = null
             currentTitle = null
@@ -156,12 +156,18 @@ class BiliAdapter(
     }
 
     private fun extractScreen(rootNode: AccessibilityNodeInfo?): ScreenData {
-        val detail = findFirstNodeByViewId(rootNode, "${packageName}:id/pager")
+        val detail = rootNode?.findFirstNodeByViewId("${packageName}:id/pager")
         if (detail != null) {
             val author =
-                findFirstNodeByViewId(rootNode, "${packageName}:id/author_name")?.text?.toString()
-            // 详情页下，第一个通常是主标题
-            val title = findFirstNodeByViewId(detail, "${packageName}:id/title")
+                rootNode.findFirstNodeByViewId("${packageName}:id/author_name")?.text?.toString()
+            val titles = detail.findAccessibilityNodeInfosByViewId("${packageName}:id/title")
+            // 详情页下，第一个通常是主标题，但也可能是直播预约，直播预约的父节点的最后一个子节点是关闭按钮
+            val title = titles.firstOrNull {
+                it.parent?.childCount?.let { count ->
+                    val child = it.parent.getChild(count - 1)
+                    child?.viewIdResourceName != "${packageName}:id/close"
+                } ?: true
+            }
             val text = title?.text?.toString().orEmpty()
             val contentDesc = title?.contentDescription?.toString().orEmpty()
             return ScreenData(author, "$contentDesc $text".trim())
@@ -170,16 +176,15 @@ class BiliAdapter(
         // 全屏但视频完成时，通常没有 author_name，当前视频的UP主是 name，推荐视频的是 author，
         // 如果再找不到那就只能说明是全屏播放无控件状态了，什么都没有，我们也无能为力
         val author =
-            findFirstNodeByViewId(rootNode, "${packageName}:id/name")?.text?.toString()
+            rootNode?.findFirstNodeByViewId("${packageName}:id/name")?.text?.toString()
         return ScreenData(author, null)
     }
 
 
-    private fun findFirstNodeByViewId(
-        rootNode: AccessibilityNodeInfo?,
+    private fun AccessibilityNodeInfo.findFirstNodeByViewId(
         viewId: String
     ): AccessibilityNodeInfo? {
-        return rootNode?.findAccessibilityNodeInfosByViewId(viewId)?.firstOrNull()
+        return this.findAccessibilityNodeInfosByViewId(viewId)?.firstOrNull()
     }
 
 }
