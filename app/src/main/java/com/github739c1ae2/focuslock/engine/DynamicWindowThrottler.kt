@@ -22,7 +22,7 @@ import kotlin.time.Duration.Companion.milliseconds
 class DynamicWindowThrottler(
     private val workerScope: CoroutineScope,
     private val stateDispatcher: CoroutineDispatcher = Dispatchers.Main.immediate,
-    private val action: () -> Unit
+    private val action: suspend () -> Unit
 ) {
     private val stateScope = CoroutineScope(stateDispatcher + SupervisorJob())
 
