@@ -34,8 +34,8 @@
     <string name="app_adapter_config_choice_generic_allow">放行</string>
     <string name="lock_overlay_warning">距离锁机开始还有 %1$d 秒！</string>
     <string name="text_field_label_input_seconds">请输入秒数</string>
-    <string name="text_field_supporting_text_duration_range_seconds">范围: %1$d - %2$d 秒</string>
-    <string name="ok_with_seconds">确定 (%1$ds)</string>
+    <string name="text_field_supporting_text_duration_range_seconds_fmt">范围: %1$d - %2$d 秒</string>
+    <string name="ok_with_seconds_fmt">确定 (%1$ds)</string>
     <string name="global_profile_name">全局配置</string>
     <string name="schedule_list_title">时间段</string>
     <string name="empty_schedules">还没有时间段，点击右下角新建</string>
@@ -52,8 +52,8 @@
     <string name="save">保存</string>
     <string name="delete">删除</string>
     <string name="edit">编辑</string>
-    <string name="confirm_delete_schedule">确定删除时间段「%1$s」吗？</string>
-    <string name="confirm_delete_profile">确定删除配置「%1$s」吗？与之关联的时间段将被设置为全局配置。</string>
+    <string name="confirm_delete_schedule_fmt">确定删除时间段「%1$s」吗？</string>
+    <string name="confirm_delete_profile_fmt">确定删除配置「%1$s」吗？与之关联的时间段将被设置为全局配置。</string>
     <string name="profile_name">名称</string>
     <string name="mode">黑白名单</string>
     <string name="mode_whitelist">白名单</string>
@@ -134,4 +134,5 @@
     <string name="write_secure_settings_permission_required_message">请用 adb 连接你的设备，并执行下方命令</string>
     <string name="engine_error_too_frequent">锁机引擎异常过于频繁，服务暂时关闭</string>
     <string name="a11y_service_stop_too_frequent">锁机服务频繁中止，请检查是否被系统拦截，无障碍守护将暂时关闭</string>
+    <string name="custom_quick_lock">自定义...</string>
 </resources>

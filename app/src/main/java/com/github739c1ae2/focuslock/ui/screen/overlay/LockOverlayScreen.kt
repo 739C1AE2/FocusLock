@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.Android
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -149,7 +150,7 @@ fun LockedScreen(state: OverlayState.Locked, viewModel: OverlayViewModel) {
 
                 is AllowedAppListState.Loaded -> {
                     LazyVerticalGrid(
-                        columns = GridCells.Fixed(4),
+                        columns = GridCells.Adaptive(minSize = 72.dp),
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxWidth()
@@ -159,7 +160,7 @@ fun LockedScreen(state: OverlayState.Locked, viewModel: OverlayViewModel) {
                                 horizontalAlignment = Alignment.CenterHorizontally,
                                 modifier = Modifier
                                     .clickable { viewModel.onLaunchApp(app.packageName) }
-                                    .padding(8.dp)
+                                    .padding(6.dp, 8.dp)
                             ) {
                                 AsyncImage(
                                     model = ImageRequest.Builder(LocalContext.current)
@@ -172,9 +173,12 @@ fun LockedScreen(state: OverlayState.Locked, viewModel: OverlayViewModel) {
                                         .clip(RoundedCornerShape(4.dp)),
                                     placeholder = rememberVectorPainter(Icons.Default.Android)
                                 )
+                                Spacer(modifier = Modifier.height(6.dp))
                                 Text(
                                     app.appName,
-                                    style = MaterialTheme.typography.labelSmall
+                                    style = MaterialTheme.typography.labelSmall,
+                                    maxLines = 2,
+                                    textAlign = TextAlign.Center
                                 )
                             }
                         }
@@ -232,19 +236,17 @@ fun LockedScreen(state: OverlayState.Locked, viewModel: OverlayViewModel) {
 
 @Composable
 fun WarningScreen(state: OverlayState.Warning) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(
-                color = MaterialTheme.colorScheme.background,
-                shape = RoundedCornerShape(16.dp)
-            )
-            .padding(16.dp, 32.dp)
+    Card(
+        modifier = Modifier.padding(top = 32.dp)
     ) {
         Text(
-            text = stringResource(R.string.lock_overlay_warning, state.remaining.inWholeSeconds),
+            text = stringResource(
+                R.string.lock_overlay_warning,
+                state.remaining.inWholeSeconds
+            ),
             modifier = Modifier
-                .fillMaxWidth(),
+                .fillMaxWidth()
+                .padding(16.dp, 32.dp),
             textAlign = TextAlign.Center,
             style = MaterialTheme.typography.titleMedium
         )
@@ -278,7 +280,7 @@ fun DurationInputDialog(
         onDismiss = onDismiss,
         label = stringResource(R.string.text_field_label_input_seconds),
         supportingText = stringResource(
-            R.string.text_field_supporting_text_duration_range_seconds,
+            R.string.text_field_supporting_text_duration_range_seconds_fmt,
             minSeconds,
             maxSeconds
         ),
@@ -319,7 +321,7 @@ fun CountDownConfirmDialog(
                 enabled = timeLeft == 0
             ) {
                 val text = if (timeLeft > 0) {
-                    stringResource(R.string.ok_with_seconds, timeLeft)
+                    stringResource(R.string.ok_with_seconds_fmt, timeLeft)
                 } else {
                     stringResource(android.R.string.ok)
                 }

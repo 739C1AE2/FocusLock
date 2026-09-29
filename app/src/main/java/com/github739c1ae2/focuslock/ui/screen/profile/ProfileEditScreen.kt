@@ -200,7 +200,7 @@ fun ProfileEditScreen(
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
             title = { Text(stringResource(R.string.delete)) },
-            text = { Text(stringResource(R.string.confirm_delete_profile, name)) },
+            text = { Text(stringResource(R.string.confirm_delete_profile_fmt, name)) },
             confirmButton = {
                 TextButton(onClick = {
                     showDeleteConfirm = false

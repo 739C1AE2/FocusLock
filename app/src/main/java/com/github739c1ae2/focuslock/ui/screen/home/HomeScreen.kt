@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -14,8 +15,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
@@ -323,25 +322,25 @@ fun QuickLockConfigPanel(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        LazyRow(
+        FlowRow(
+            modifier = Modifier
+                .fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            items(presetTimes) { time ->
+            presetTimes.forEach { time ->
                 FilterChip(
                     selected = selectedMinutes == time,
                     onClick = { onSelectMinutes(time) },
-                    label = { Text("${time}m") },
+                    label = { Text(text = "${time}m") },
                     shape = CircleShape
                 )
             }
-            item {
-                FilterChip(
-                    selected = !presetTimes.contains(selectedMinutes),
-                    onClick = { showCustomDialog = true },
-                    label = { Text("自定义...") },
-                    shape = CircleShape
-                )
-            }
+            FilterChip(
+                selected = !presetTimes.contains(selectedMinutes),
+                onClick = { showCustomDialog = true },
+                label = { Text(text = stringResource(R.string.custom_quick_lock)) },
+                shape = CircleShape
+            )
         }
     }
     if (showCustomDialog) {

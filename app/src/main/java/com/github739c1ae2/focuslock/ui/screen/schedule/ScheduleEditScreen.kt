@@ -178,7 +178,7 @@ fun ScheduleEditScreen(
             onDismissRequest = { showDeleteConfirm = false },
             title = { Text(stringResource(R.string.delete)) },
             text = {
-                Text(stringResource(R.string.confirm_delete_schedule, name)) },
+                Text(stringResource(R.string.confirm_delete_schedule_fmt, name)) },
             confirmButton = {
                 TextButton(onClick = {
                     showDeleteConfirm = false
