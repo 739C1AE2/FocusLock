@@ -5,6 +5,8 @@ import androidx.room3.ColumnTypeConverters
 import androidx.room3.Database
 import androidx.room3.Room
 import androidx.room3.RoomDatabase
+import androidx.room3.migration.Migration
+import androidx.sqlite.SQLiteConnection
 import com.github739c1ae2.focuslock.R
 import dagger.Module
 import dagger.Provides
@@ -21,12 +23,23 @@ import javax.inject.Singleton
         ProfileAppRuleEntity::class,
         ScheduleEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 @ColumnTypeConverters(LockTypeConverters::class)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun lockDao(): LockDao
+}
+
+val MIGRATION_1_2 = object : Migration(1, 2) {
+    override suspend fun migrate(connection: SQLiteConnection) {
+        connection.prepare(
+            "ALTER TABLE schedules ADD COLUMN sortOrder INTEGER NOT NULL DEFAULT 0"
+        ).use { it.step() }
+        connection.prepare(
+            "UPDATE schedules SET sortOrder = startMinute"
+        ).use { it.step() }
+    }
 }
 
 @Module
@@ -40,7 +53,8 @@ object DatabaseModule {
             context,
             AppDatabase::class.java,
             "app_database"
-        ).build()
+        ).addMigrations(MIGRATION_1_2)
+            .build()
     }
 
     @Provides

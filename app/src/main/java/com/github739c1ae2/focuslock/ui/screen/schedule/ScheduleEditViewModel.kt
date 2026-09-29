@@ -5,7 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.github739c1ae2.focuslock.R
 import com.github739c1ae2.focuslock.database.LockRepository
 import com.github739c1ae2.focuslock.database.ProfileEntity
-import com.github739c1ae2.focuslock.database.ScheduleEntity
+import com.github739c1ae2.focuslock.database.ScheduleEditDto
 import com.github739c1ae2.focuslock.util.FormDraft
 import com.github739c1ae2.focuslock.util.UiText
 import com.github739c1ae2.focuslock.util.ValidatedField
@@ -52,8 +52,8 @@ data class ScheduleDraft(
         )
     }
 
-    fun toEntity(): ScheduleEntity {
-        return ScheduleEntity(
+    fun toDto(): ScheduleEditDto {
+        return ScheduleEditDto(
             id = id,
             name = name.value,
             daysOfWeek = daysOfWeek,
@@ -64,14 +64,14 @@ data class ScheduleDraft(
     }
 
     companion object {
-        fun fromEntity(entity: ScheduleEntity): ScheduleDraft {
+        fun fromDto(schedule: ScheduleEditDto): ScheduleDraft {
             return ScheduleDraft(
-                id = entity.id,
-                name = ValidatedField(entity.name),
-                daysOfWeek = entity.daysOfWeek,
-                startMinute = ValidatedField(entity.startMinute),
-                endMinute = ValidatedField(entity.endMinute),
-                profileId = entity.profileId
+                id = schedule.id,
+                name = ValidatedField(schedule.name),
+                daysOfWeek = schedule.daysOfWeek,
+                startMinute = ValidatedField(schedule.startMinute),
+                endMinute = ValidatedField(schedule.endMinute),
+                profileId = schedule.profileId
             ).toValidated()
         }
     }
@@ -116,9 +116,9 @@ class ScheduleEditViewModel @AssistedInject constructor(
 
     fun load() {
         viewModelScope.launch {
-            val schedule = repository.getScheduleById(scheduleId)
+            val schedule = repository.getScheduleEditDtoById(scheduleId)
             if (schedule != null) {
-                val scheduleDraft = ScheduleDraft.fromEntity(schedule)
+                val scheduleDraft = ScheduleDraft.fromDto(schedule)
                 scheduleState.value = ScheduleState.Loaded(scheduleDraft, isDirty = false)
             } else {
                 scheduleState.value = ScheduleState.Failed
@@ -152,11 +152,10 @@ class ScheduleEditViewModel @AssistedInject constructor(
         val state = scheduleState.value
         if (state !is ScheduleState.Loaded) return
         viewModelScope.launch {
-            val schedule = state.schedule.toEntity()
-            val newSchedule = repository.saveScheduleWithoutIsActive(schedule)
+            val schedule = state.schedule.toDto()
+            repository.updateScheduleEditDto(schedule)
             eventFlow.emit(UiEvent.ScheduleSaved)
-            scheduleState.value =
-                ScheduleState.Loaded(ScheduleDraft.fromEntity(newSchedule), isDirty = false)
+            scheduleState.value = state.copy(isDirty = false)
         }
     }
 

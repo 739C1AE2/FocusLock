@@ -112,36 +112,39 @@ class LockRepository @Inject constructor(
         dao.deleteProfileById(profileId)
     }
 
-    suspend fun saveSchedule(schedule: ScheduleEntity): Long = withContext(Dispatchers.IO) {
-        if (schedule.id == 0L) {
-            dao.insertSchedule(schedule)
-        } else {
-            dao.updateSchedule(schedule)
-            schedule.id
+    suspend fun updateScheduleActiveStatus(scheduleId: Long, isActive: Boolean) =
+        withContext(Dispatchers.IO) {
+            dao.updateScheduleActiveStatus(scheduleId, isActive)
+        }
+
+    suspend fun createSchedule(name: String): Long = withContext(Dispatchers.IO) {
+        database.withWriteTransaction {
+            val newSchedule = ScheduleEntity(
+                name = name,
+                daysOfWeek = WEEKDAY_SET,
+                startMinute = 8 * 60,
+                endMinute = 9 * 60,
+                isActive = false,
+                sortOrder = dao.getMaxScheduleSortOrder() + 1
+            )
+            dao.insertSchedule(newSchedule)
         }
     }
 
-    suspend fun saveScheduleWithoutIsActive(schedule: ScheduleEntity): ScheduleEntity =
-        withContext(Dispatchers.IO) {
-            database.withWriteTransaction {
-                val existing = dao.getScheduleById(schedule.id)
-                if (existing == null) {
-                    val id = dao.insertSchedule(schedule.copy(isActive = false))
-                    schedule.copy(id = id, isActive = false)
-                } else {
-                    val updated = schedule.copy(isActive = existing.isActive)
-                    dao.updateSchedule(updated)
-                    updated
-                }
-            }
-        }
+    suspend fun updateSchedulesOrder(orderedIds: List<Long>) = withContext(Dispatchers.IO) {
+        dao.updateAllScheduleSortOrders(orderedIds)
+    }
 
     suspend fun deleteScheduleById(id: Long) = withContext(Dispatchers.IO) {
         dao.deleteScheduleById(id)
     }
 
-    suspend fun getScheduleById(id: Long): ScheduleEntity? = withContext(Dispatchers.IO) {
-        dao.getScheduleById(id)
+    suspend fun getScheduleEditDtoById(id: Long): ScheduleEditDto? = withContext(Dispatchers.IO) {
+        dao.getScheduleById(id)?.toEditDto()
+    }
+
+    suspend fun updateScheduleEditDto(schedule: ScheduleEditDto) = withContext(Dispatchers.IO) {
+        dao.updateScheduleEditDto(schedule)
     }
 
     suspend fun startQuickLock(quickLock: QuickLockEntity) = withContext(Dispatchers.IO) {
@@ -180,20 +183,15 @@ class LockRepository @Inject constructor(
                 yesterdayStr = yesterday.value.toString(),
                 currentMinute = currentMinute
             )
-            if (activeSchedules.isNotEmpty()) {
-                return@withWriteTransaction activeSchedules
-                    .map { schedule ->
-                        val (startTime, endTime) = schedule.getStartAndEndTimeMillis(now)
-                        ActiveLockSession(
-                            profileId = schedule.profileId,
-                            startTimeMillis = startTime,
-                            endTimeMillis = endTime,
-                            source = LockSource.Schedule(scheduleId = schedule.id)
-                        )
-                    }
-                    .maxByOrNull { it.endTimeMillis }
+            return@withWriteTransaction activeSchedules.firstOrNull()?.let { schedule ->
+                val (startTime, endTime) = schedule.getStartAndEndTimeMillis(now)
+                ActiveLockSession(
+                    profileId = schedule.profileId,
+                    startTimeMillis = startTime,
+                    endTimeMillis = endTime,
+                    source = LockSource.Schedule(scheduleId = schedule.id)
+                )
             }
-            return@withWriteTransaction null
         }
     }
 

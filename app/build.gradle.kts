@@ -81,6 +81,7 @@ dependencies {
     ksp(libs.hilt.compiler)
     implementation(libs.androidx.room3.runtime)
     implementation(libs.kotlinx.serialization.json)
+    implementation(libs.reorderable)
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)

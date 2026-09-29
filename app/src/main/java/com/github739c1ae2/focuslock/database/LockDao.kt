@@ -49,8 +49,11 @@ interface LockDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertSchedule(schedule: ScheduleEntity): Long
 
-    @Update
-    suspend fun updateSchedule(schedule: ScheduleEntity)
+    @Query("UPDATE schedules SET isActive = :isActive WHERE id = :scheduleId")
+    suspend fun updateScheduleActiveStatus(scheduleId: Long, isActive: Boolean)
+
+    @Update(entity = ScheduleEntity::class)
+    suspend fun updateScheduleEditDto(schedule: ScheduleEditDto)
 
     @Query("DELETE FROM schedules WHERE id = :id")
     suspend fun deleteScheduleById(id: Long)
@@ -65,9 +68,22 @@ interface LockDao {
         SELECT schedules.*, profiles.name AS profileName 
         FROM schedules 
         INNER JOIN profiles ON schedules.profileId = profiles.id
-        ORDER BY schedules.startMinute ASC
+        ORDER BY schedules.sortOrder ASC, schedules.id ASC
     """)
     fun observeAllSchedulesWithProfile(): Flow<List<ScheduleWithProfileName>>
+
+    @Query("SELECT COALESCE(MAX(sortOrder), -1) FROM schedules")
+    suspend fun getMaxScheduleSortOrder(): Int
+
+    @Query("UPDATE schedules SET sortOrder = :sortOrder WHERE id = :id")
+    suspend fun updateScheduleSortOrder(id: Long, sortOrder: Int)
+
+    @Transaction
+    suspend fun updateAllScheduleSortOrders(orderedIds: List<Long>) {
+        orderedIds.forEachIndexed { index, id ->
+            updateScheduleSortOrder(id, index)
+        }
+    }
 
     @Query("SELECT * FROM schedules WHERE schedules.profileId = :profileId")
     fun observeSchedulesByProfileId(profileId: Long): Flow<List<ScheduleEntity>>
@@ -99,6 +115,7 @@ interface LockDao {
              AND (daysOfWeek = '' OR daysOfWeek LIKE '%' || :yesterdayStr || '%')
              AND :currentMinute < endMinute)
         )
+        ORDER BY sortOrder ASC, id ASC
     """)
     suspend fun getActiveSchedules(
         todayStr: String,

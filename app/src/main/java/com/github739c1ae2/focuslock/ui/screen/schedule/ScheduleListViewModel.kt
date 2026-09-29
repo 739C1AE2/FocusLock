@@ -5,7 +5,6 @@ import androidx.lifecycle.viewModelScope
 import com.github739c1ae2.focuslock.database.LockRepository
 import com.github739c1ae2.focuslock.database.ScheduleEntity
 import com.github739c1ae2.focuslock.database.ScheduleWithProfileName
-import com.github739c1ae2.focuslock.database.WEEKDAY_SET
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -30,22 +29,21 @@ class ScheduleListViewModel @Inject constructor(
             initialValue = emptyList()
         )
 
+    fun saveOrder(orderedSchedules: List<ScheduleEntity>) {
+        viewModelScope.launch {
+            repository.updateSchedulesOrder(orderedSchedules.map { it.id })
+        }
+    }
+
     fun setScheduleActive(schedule: ScheduleEntity, active: Boolean) {
         viewModelScope.launch {
-            repository.saveSchedule(schedule.copy(isActive = active))
+            repository.updateScheduleActiveStatus(schedule.id, active)
         }
     }
 
     fun createSchedule(name: String) {
-        val newSchedule = ScheduleEntity(
-            name = name,
-            daysOfWeek = WEEKDAY_SET,
-            startMinute = 8 * 60,
-            endMinute = 9 * 60,
-            isActive = false
-        )
         viewModelScope.launch {
-            val newScheduleId = repository.saveSchedule(newSchedule)
+            val newScheduleId = repository.createSchedule(name)
             createResult.emit(newScheduleId)
         }
     }

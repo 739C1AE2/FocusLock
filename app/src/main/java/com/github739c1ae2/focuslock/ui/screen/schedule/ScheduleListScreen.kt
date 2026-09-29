@@ -1,5 +1,6 @@
 package com.github739c1ae2.focuslock.ui.screen.schedule
 
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -9,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.Card
@@ -23,6 +25,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -41,6 +44,8 @@ import com.github739c1ae2.focuslock.database.WEEKDAY_SET
 import com.github739c1ae2.focuslock.ui.components.InputDialog
 import com.github739c1ae2.focuslock.ui.components.customCardColors
 import com.github739c1ae2.focuslock.util.minutesToClockString
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.rememberReorderableLazyListState
 import java.time.format.TextStyle
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -53,6 +58,21 @@ fun ScheduleListScreen(
 ) {
     val schedules by viewModel.schedules.collectAsStateWithLifecycle()
     var showCreateDialog by remember { mutableStateOf(false) }
+
+    val scheduleItems = remember { mutableStateListOf<ScheduleWithProfileName>() }
+    var isReordering by remember { mutableStateOf(false) }
+
+    LaunchedEffect(schedules) {
+        if (!isReordering) {
+            scheduleItems.clear()
+            scheduleItems.addAll(schedules)
+        }
+    }
+
+    val lazyListState = rememberLazyListState()
+    val reorderableState = rememberReorderableLazyListState(lazyListState) { from, to ->
+        scheduleItems.add(to.index, scheduleItems.removeAt(from.index))
+    }
 
     LaunchedEffect(Unit) {
         viewModel.createResult.collect { newScheduleId ->
@@ -81,13 +101,14 @@ fun ScheduleListScreen(
         }
     ) { innerPadding ->
         LazyColumn(
+            state = lazyListState,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding),
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            if (schedules.isEmpty()) {
+            if (scheduleItems.isEmpty()) {
                 item {
                     Text(
                         text = stringResource(R.string.empty_schedules),
@@ -98,17 +119,34 @@ fun ScheduleListScreen(
                 }
             } else {
                 items(
-                    items = schedules,
+                    items = scheduleItems,
                     key = { it.schedule.id }
                 ) { schedule ->
-                    ScheduleCard(
-                        isSelected = schedule.schedule.id == selectedScheduleId,
-                        schedule = schedule,
-                        onEdit = dropUnlessResumed { onEditSchedule(schedule.schedule.id) },
-                        onToggleActive = { active ->
-                            viewModel.setScheduleActive(schedule.schedule, active)
+                    ReorderableItem(
+                        state = reorderableState,
+                        key = schedule.schedule.id
+                    ) {
+                        val interactionSource = remember {
+                            MutableInteractionSource()
                         }
-                    )
+                        ScheduleCard(
+                            isSelected = schedule.schedule.id == selectedScheduleId,
+                            schedule = schedule,
+                            onEdit = dropUnlessResumed { onEditSchedule(schedule.schedule.id) },
+                            onToggleActive = { active ->
+                                viewModel.setScheduleActive(schedule.schedule, active)
+                            },
+                            interactionSource = interactionSource,
+                            modifier = Modifier.longPressDraggableHandle(
+                                interactionSource = interactionSource,
+                                onDragStarted = { isReordering = true },
+                                onDragStopped = {
+                                    isReordering = false
+                                    viewModel.saveOrder(scheduleItems.map { it.schedule })
+                                }
+                            )
+                        )
+                    }
                 }
             }
 
@@ -144,8 +182,10 @@ fun ScheduleListScreen(
 private fun ScheduleCard(
     isSelected: Boolean,
     schedule: ScheduleWithProfileName,
+    interactionSource: MutableInteractionSource,
     onEdit: () -> Unit,
-    onToggleActive: (Boolean) -> Unit
+    onToggleActive: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val cardColors = customCardColors(
         isSelected = isSelected,
@@ -153,8 +193,9 @@ private fun ScheduleCard(
     )
     Card(
         onClick = onEdit,
-        modifier = Modifier.fillMaxWidth(),
-        colors = cardColors
+        modifier = modifier.fillMaxWidth(),
+        colors = cardColors,
+        interactionSource = interactionSource
     ) {
         Row(
             modifier = Modifier

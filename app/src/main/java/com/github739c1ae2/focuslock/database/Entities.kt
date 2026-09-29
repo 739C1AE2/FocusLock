@@ -42,7 +42,9 @@ data class ScheduleEntity(
     val endMinute: Int,
     @ColumnInfo(defaultValue = "$GLOBAL_PROFILE_ID")
     val profileId: Long = GLOBAL_PROFILE_ID,
-    val isActive: Boolean = true
+    val isActive: Boolean = true,
+    @ColumnInfo(defaultValue = "0")
+    val sortOrder: Int = 0
 ) {
     fun getStartAndEndTimeMillis(nowMillis: Long): Pair<Long, Long> {
         val zoneId = ZoneId.systemDefault()
@@ -75,7 +77,27 @@ data class ScheduleEntity(
             .toEpochMilli()
         return Pair(startTime, endTime)
     }
+
+    fun toEditDto(): ScheduleEditDto {
+        return ScheduleEditDto(
+            id = this.id,
+            name = this.name,
+            daysOfWeek = this.daysOfWeek,
+            startMinute = this.startMinute,
+            endMinute = this.endMinute,
+            profileId = this.profileId
+        )
+    }
 }
+
+data class ScheduleEditDto(
+    val id: Long = 0,
+    val name: String,
+    val daysOfWeek: Set<DayOfWeek>,
+    val startMinute: Int,
+    val endMinute: Int,
+    val profileId: Long
+)
 
 @Entity(
     tableName = "quick_lock",
