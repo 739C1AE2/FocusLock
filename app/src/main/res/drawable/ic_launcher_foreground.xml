@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Top-left focus corner -->
+    <path
+        android:fillColor="@android:color/transparent"
+        android:pathData="M40,34 L34,34 L34,40"
+        android:strokeColor="@color/ic_launcher_foreground"
+        android:strokeWidth="4"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+
+    <!-- Top-right focus corner -->
+    <path
+        android:fillColor="@android:color/transparent"
+        android:pathData="M68,34 L74,34 L74,40"
+        android:strokeColor="@color/ic_launcher_foreground"
+        android:strokeWidth="4"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+
+    <!-- Bottom-left focus corner -->
+    <path
+        android:fillColor="@android:color/transparent"
+        android:pathData="M34,68 L34,74 L40,74"
+        android:strokeColor="@color/ic_launcher_foreground"
+        android:strokeWidth="4"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+
+    <!-- Bottom-right focus corner -->
+    <path
+        android:fillColor="@android:color/transparent"
+        android:pathData="M74,68 L74,74 L68,74"
+        android:strokeColor="@color/ic_launcher_foreground"
+        android:strokeWidth="4"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+
+    <!-- lock shackle -->
+    <path
+        android:fillColor="@android:color/transparent"
+        android:pathData="
+        M50,51
+        L50,46
+        C50,43.239 52.239,41 55,41
+        C57.761,41 60,43.239 60,46
+        L60,51"
+        android:strokeColor="@color/ic_launcher_foreground"
+        android:strokeWidth="4"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+
+    <!-- lock body -->
+    <path
+        android:fillColor="@color/ic_launcher_foreground"
+        android:fillType="evenOdd"
+        android:pathData="
+        M49,49
+        L61,49
+        C63.761,49 66,51.239 66,54
+        L66,63
+        C66,65.761 63.761,68 61,68
+        L49,68
+        C46.239,68 44,65.761 44,63
+        L44,54
+        C44,51.239 46.239,49 49,49
+        Z
+
+        M55,54
+        C53.067,54 51.5,55.567 51.5,57.5
+        C51.5,58.822 52.24,59.976 53.33,60.5
+        L52.6,63.5
+        L57.4,63.5
+        L56.67,60.5
+        C57.76,59.976 58.5,58.822 58.5,57.5
+        C58.5,55.567 56.933,54 55,54
+        Z
+    " />
+
+</vector>
