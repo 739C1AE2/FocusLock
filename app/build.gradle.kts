@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -7,6 +9,18 @@ plugins {
     alias(libs.plugins.hilt)
     alias(libs.plugins.aboutLibraries)
 }
+
+val localProperties = Properties().apply {
+    val localPropertiesFile = rootProject.file("local.properties")
+    if (localPropertiesFile.exists()) {
+        localPropertiesFile.inputStream().use { stream ->
+            load(stream)
+        }
+    }
+}
+
+fun getSecretProp(key: String): String? =
+    localProperties.getProperty(key) ?: System.getenv(key)
 
 android {
     namespace = "com.github739c1ae2.focuslock"
@@ -21,15 +35,40 @@ android {
         minSdk = 24
         targetSdk = 37
         versionCode = 1
-        versionName = "1.0"
+        versionName = "1.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        val envKeyPath = getSecretProp("ANDROID_KEYSTORE_FILE")
+        val keystoreFile = envKeyPath?.let { file(it) }
+
+        if (keystoreFile != null && keystoreFile.exists()) {
+            create("release") {
+                storeFile = keystoreFile
+                storePassword = getSecretProp("ANDROID_KEYSTORE_PASSWORD")
+                keyAlias = getSecretProp("ANDROID_KEY_ALIAS")
+                keyPassword = getSecretProp("ANDROID_KEY_PASSWORD")
+            }
+        }
+    }
+
+
     buildTypes {
+        debug {
+            signingConfigs.findByName("release")?.let {
+                signingConfig = it
+            }
+        }
+
         release {
             optimization {
                 enable = true
+            }
+
+            signingConfigs.findByName("release")?.let {
+                signingConfig = it
             }
         }
     }
