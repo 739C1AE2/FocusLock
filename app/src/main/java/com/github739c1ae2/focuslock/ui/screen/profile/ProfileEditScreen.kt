@@ -5,9 +5,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.plus
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
@@ -61,6 +63,8 @@ import com.github739c1ae2.focuslock.database.GLOBAL_PROFILE_ID
 import com.github739c1ae2.focuslock.database.ScheduleEntity
 import com.github739c1ae2.focuslock.ui.screen.adapter.AdapterConfigInfo
 import com.github739c1ae2.focuslock.util.AppIconRequest
+import com.github739c1ae2.focuslock.util.calculateImeAwareScaffoldInsets
+import com.github739c1ae2.focuslock.util.applyImeInsetsAndConsumeScaffoldPadding
 import com.github739c1ae2.focuslock.util.minutesToClockString
 import kotlinx.serialization.Serializable
 
@@ -160,7 +164,8 @@ fun ProfileEditScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(innerPadding),
+                        .padding(innerPadding)
+                        .consumeWindowInsets(innerPadding),
                     contentAlignment = Alignment.Center
                 ) {
                     CircularProgressIndicator()
@@ -171,7 +176,8 @@ fun ProfileEditScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(innerPadding),
+                        .padding(innerPadding)
+                        .consumeWindowInsets(innerPadding),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(stringResource(R.string.failed_to_load_profile))
@@ -188,7 +194,7 @@ fun ProfileEditScreen(
                     onAddRules = viewModel::addRules,
                     onConfigureAdapter = onConfigureAdapter,
                     onRemoveRule = viewModel::removeRule,
-                    modifier = Modifier.padding(innerPadding)
+                    innerPadding = innerPadding
                 )
             }
         }
@@ -229,13 +235,17 @@ private fun ProfileForm(
     onRemoveRule: (packageName: String) -> Unit,
     onConfigureAdapter: (packageName: String, original: AdapterConfigInfo?) -> Unit,
     modifier: Modifier = Modifier,
+    innerPadding: PaddingValues = PaddingValues(0.dp)
 ) {
     var selectedTab by remember { mutableStateOf(ProfileTab.USER_APPS) }
     var showAppPicker by remember { mutableStateOf(false) }
+
+    val insets = calculateImeAwareScaffoldInsets(innerPadding)
     LazyColumn(
         modifier = modifier
-            .fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
+            .fillMaxSize()
+            .applyImeInsetsAndConsumeScaffoldPadding(insets),
+        contentPadding = insets.contentPadding + PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         item {

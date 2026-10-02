@@ -4,11 +4,15 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
@@ -16,6 +20,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenu
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
@@ -51,6 +56,8 @@ import com.github739c1ae2.focuslock.database.ProfileEntity
 import com.github739c1ae2.focuslock.ui.components.InputDialog
 import com.github739c1ae2.focuslock.ui.components.TimeOfDayPickerDialog
 import com.github739c1ae2.focuslock.util.ValidatedField
+import com.github739c1ae2.focuslock.util.calculateImeAwareScaffoldInsets
+import com.github739c1ae2.focuslock.util.applyImeInsetsAndConsumeScaffoldPadding
 import com.github739c1ae2.focuslock.util.minutesToClockString
 import java.time.DayOfWeek
 import java.time.format.TextStyle
@@ -134,14 +141,15 @@ fun ScheduleEditScreen(
                     }
                 }
             )
-        }
+        },
     ) { innerPadding ->
         when (val state = state) {
             is ScheduleState.Loading -> {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(innerPadding),
+                        .padding(innerPadding)
+                        .consumeWindowInsets(innerPadding),
                     contentAlignment = Alignment.Center
                 ) {
                     CircularProgressIndicator()
@@ -152,7 +160,8 @@ fun ScheduleEditScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(innerPadding),
+                        .padding(innerPadding)
+                        .consumeWindowInsets(innerPadding),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(stringResource(R.string.failed_to_load_schedule))
@@ -165,7 +174,7 @@ fun ScheduleEditScreen(
                     profiles = viewModel.profiles.collectAsState().value,
                     onScheduleChange = viewModel::updateSchedule,
                     onCreateProfile = viewModel::createProfile,
-                    modifier = Modifier.padding(innerPadding)
+                    innerPadding = innerPadding
                 )
             }
         }
@@ -204,14 +213,19 @@ private fun ScheduleForm(
     profiles: List<ProfileEntity>,
     onScheduleChange: (ScheduleDraft) -> Unit,
     onCreateProfile: (String) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    innerPadding: PaddingValues = PaddingValues(0.dp)
 ) {
+    val insets = calculateImeAwareScaffoldInsets(innerPadding)
     var showStartPicker by remember { mutableStateOf(false) }
     var showEndPicker by remember { mutableStateOf(false) }
     var showNewProfileDialog by remember { mutableStateOf(false) }
     Column(
         modifier = modifier
             .fillMaxSize()
+            .applyImeInsetsAndConsumeScaffoldPadding(insets)
+            .verticalScroll(rememberScrollState())
+            .padding(insets.contentPadding)
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {

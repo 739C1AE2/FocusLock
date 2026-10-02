@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.plus
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -32,6 +33,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github739c1ae2.focuslock.R
 import com.github739c1ae2.focuslock.adapter.ConfigValue
 import com.github739c1ae2.focuslock.ui.navigation.scene.AdaptiveDialogScaffold
+import com.github739c1ae2.focuslock.util.calculateImeAwareScaffoldInsets
+import com.github739c1ae2.focuslock.util.applyImeInsetsAndConsumeScaffoldPadding
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -64,11 +67,13 @@ fun AdapterConfigScreen(
             )
         }
 
-    ) {
+    ) { innerPadding ->
+        val insets = calculateImeAwareScaffoldInsets(innerPadding)
         LazyColumn(
             modifier = Modifier
-                .fillMaxWidth(),
-            contentPadding = PaddingValues(16.dp),
+                .fillMaxWidth()
+                .applyImeInsetsAndConsumeScaffoldPadding(insets),
+            contentPadding = insets.contentPadding + PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
 

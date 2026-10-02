@@ -12,11 +12,13 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.plus
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
@@ -117,8 +119,9 @@ fun SettingsScreen(
     ) { padding ->
         SettingsList(
             modifier = Modifier
-                .padding(padding)
-                .fillMaxSize(),
+                .fillMaxSize()
+                .consumeWindowInsets(padding),
+            contentPadding = padding,
             selectedRoute = selectedRoute,
             state = state,
             onNavigateTo = onNavigateTo,
@@ -191,6 +194,7 @@ fun SettingsScreen(
 @Composable
 private fun SettingsList(
     modifier: Modifier = Modifier,
+    contentPadding: PaddingValues = PaddingValues(0.dp),
     selectedRoute: AppRoute.SettingsDetail?,
     state: SettingsUiState,
     onNavigateTo: (AppRoute) -> Unit,
@@ -200,7 +204,7 @@ private fun SettingsList(
 ) {
     LazyColumn(
         modifier = modifier,
-        contentPadding = PaddingValues(16.dp),
+        contentPadding = contentPadding + PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         item {

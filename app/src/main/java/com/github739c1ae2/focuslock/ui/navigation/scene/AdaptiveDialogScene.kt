@@ -3,11 +3,14 @@ package com.github739c1ae2.focuslock.ui.navigation.scene
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeContent
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
@@ -120,13 +123,16 @@ fun AdaptiveDialogScaffold(
     onConfirm: (() -> Unit),
     confirmText: String = stringResource(id = R.string.save),
     dismissText: String = stringResource(id = android.R.string.cancel),
-    content: @Composable () -> Unit
+    content: @Composable (PaddingValues) -> Unit
 ) {
     val isDialogMode = LocalAdaptiveDialogIsBasicDialog.current
 
     if (isDialogMode) {
         Surface(
-            modifier = Modifier.widthIn(min = 280.dp, max = 560.dp),
+            modifier = Modifier
+                .widthIn(min = 280.dp, max = 560.dp)
+                // 全部消费掉，对话框窗口已经自动避让 IME 等区域了
+                .consumeWindowInsets(WindowInsets.safeContent),
             shape = AlertDialogDefaults.shape,
             color = AlertDialogDefaults.containerColor,
             tonalElevation = AlertDialogDefaults.TonalElevation
@@ -147,7 +153,7 @@ fun AdaptiveDialogScaffold(
                             .weight(weight = 1f, fill = false)
                             .padding(bottom = 24.dp)
                     ) {
-                        content()
+                        content(PaddingValues(0.dp))
                     }
                 }
 
@@ -190,13 +196,7 @@ fun AdaptiveDialogScaffold(
                 )
             }
         ) { innerPadding ->
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding)
-            ) {
-                content()
-            }
+            content(innerPadding)
         }
     }
 }
