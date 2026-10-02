@@ -65,7 +65,7 @@ fun InputDialog(
                 ),
                 keyboardActions = KeyboardActions(
                     onDone = {
-                        if (singleLine) {
+                        if (singleLine && !isError && (allowEmpty || value.isNotEmpty())) {
                             onConfirm()
                         }
                     }
