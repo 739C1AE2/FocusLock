@@ -3,6 +3,9 @@ package com.github739c1ae2.focuslock.database
 import androidx.room3.InvalidationTracker
 import androidx.room3.withWriteTransaction
 import com.github739c1ae2.focuslock.adapter.ConfigValue
+import com.github739c1ae2.focuslock.engine.CourseOccurrence
+import com.github739c1ae2.focuslock.engine.CourseScheduleData
+import com.github739c1ae2.focuslock.engine.CourseScheduleResolver
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
@@ -29,6 +32,11 @@ data class ProfileConfig(
 sealed class LockSource {
     object QuickLock : LockSource()
     data class Schedule(val scheduleId: Long) : LockSource()
+    data class CourseSession(
+        val courseId: Long,
+        val sessionId: Long,
+        val occurrenceEpochDay: Long
+    ) : LockSource()
 }
 
 data class ActiveLockSession(
@@ -67,7 +75,7 @@ class LockRepository @Inject constructor(
         }
     }
 
-    suspend fun saveCompleteProfile(config: ProfileConfig) = withContext(Dispatchers.IO) {
+    suspend fun saveCompleteProfile(config: ProfileConfig): Long = withContext(Dispatchers.IO) {
         database.withWriteTransaction {
             val profileEntity = ProfileEntity(
                 id = config.profileId,
@@ -94,6 +102,7 @@ class LockRepository @Inject constructor(
             }
 
             dao.replaceProfileRules(actualProfileId, rulesToSave)
+            actualProfileId
         }
     }
 
@@ -163,7 +172,6 @@ class LockRepository @Inject constructor(
     suspend fun getActiveSession(): ActiveLockSession? = withContext(Dispatchers.IO) {
         database.withWriteTransaction {
             val now = System.currentTimeMillis()
-            val currentDateTime = LocalDateTime.now()
             val quickLock = dao.getActiveQuickLock(now)
             if (quickLock != null) {
                 return@withWriteTransaction ActiveLockSession(
@@ -174,6 +182,22 @@ class LockRepository @Inject constructor(
                 )
             }
 
+            // 课程时段优先于普通时间段
+            val courseOccurrence = getActiveCourseOccurrence(now)
+            if (courseOccurrence != null) {
+                return@withWriteTransaction ActiveLockSession(
+                    profileId = courseOccurrence.profileId,
+                    startTimeMillis = courseOccurrence.startMillis,
+                    endTimeMillis = courseOccurrence.endMillis,
+                    source = LockSource.CourseSession(
+                        courseId = courseOccurrence.courseId,
+                        sessionId = courseOccurrence.sessionId,
+                        occurrenceEpochDay = courseOccurrence.occurrenceEpochDay
+                    )
+                )
+            }
+
+            val currentDateTime = LocalDateTime.now()
             val currentMinute = currentDateTime.hour * 60 + currentDateTime.minute
             val today = currentDateTime.dayOfWeek
             val yesterday = today.minus(1)
@@ -195,6 +219,31 @@ class LockRepository @Inject constructor(
         }
     }
 
+    private suspend fun getActiveCourseOccurrence(nowMillis: Long): CourseOccurrence? {
+        return CourseScheduleResolver.findActive(loadCourseScheduleData(nowMillis), nowMillis)
+    }
+
+    private suspend fun loadCourseScheduleData(nowMillis: Long): CourseScheduleData {
+        val table = requireNotNull(dao.getCourseTable())
+        val baseTimeTable = requireNotNull(dao.getBaseTimeTable())
+        val today = Instant.ofEpochMilli(nowMillis).atZone(ZoneId.systemDefault()).toLocalDate()
+        val todayEpochDay = today.toEpochDay()
+        val yesterdayEpochDay = today.minusDays(1).toEpochDay()
+        return CourseScheduleData(
+            totalWeeks = table.semesterTotalWeeks,
+            firstDayOfWeek = table.firstDayOfWeek,
+            semesterStartEpochDay = table.semesterStartEpochDay,
+            baseTimeTableId = baseTimeTable.id,
+            timeTables = dao.getTimeTables(),
+            slots = dao.getAllTimeSlots(),
+            courses = dao.getActiveCoursesWithSessions(),
+            skippedByDay = mapOf(
+                todayEpochDay to dao.getSkippedSessionIdsForDay(todayEpochDay).toSet(),
+                yesterdayEpochDay to dao.getSkippedSessionIdsForDay(yesterdayEpochDay).toSet()
+            )
+        )
+    }
+
     suspend fun cancelSession(session: ActiveLockSession) = withContext(Dispatchers.IO) {
         when (val source = session.source) {
             is LockSource.QuickLock -> {
@@ -203,6 +252,16 @@ class LockRepository @Inject constructor(
 
             is LockSource.Schedule -> {
                 dao.deactivateSchedule(source.scheduleId)
+            }
+
+            is LockSource.CourseSession -> {
+                // 仅跳过本次（当天这一节）
+                dao.insertSkip(
+                    CourseSessionSkipEntity(
+                        sessionId = source.sessionId,
+                        skipEpochDay = source.occurrenceEpochDay
+                    )
+                )
             }
         }
     }
@@ -221,6 +280,10 @@ class LockRepository @Inject constructor(
                         dao.deactivateSchedule(source.scheduleId)
                     }
                 }
+
+                is LockSource.CourseSession -> {
+                    // 周期性课程，无需处理
+                }
             }
         }
     }
@@ -228,57 +291,66 @@ class LockRepository @Inject constructor(
     suspend fun getNextScheduleStartTimeMillis(nowMillis: Long): Long? =
         withContext(Dispatchers.IO) {
             database.withWriteTransaction {
-                val allActive = dao.getAllActiveSchedulesBasic()
-                if (allActive.isEmpty()) return@withWriteTransaction null
-
-                val zoneId = ZoneId.systemDefault()
-                val now = Instant.ofEpochMilli(nowMillis).atZone(zoneId)
-                val todayDate = now.toLocalDate()
-                val currentMinute = now.hour * 60 + now.minute
-
-                var closestStartMillis: Long? = null
-
-                for (schedule in allActive) {
-                    if (schedule.daysOfWeek.isEmpty()) continue
-
-                    var daysToAdd: Long? = null
-
-                    for (i in 0L..7L) {
-                        val targetLocalDate = todayDate.plusDays(i)
-                        val checkDayOfWeek = targetLocalDate.dayOfWeek
-
-                        if (schedule.daysOfWeek.contains(checkDayOfWeek)) {
-                            if (i == 0L) {
-                                if (currentMinute < schedule.startMinute) {
-                                    daysToAdd = 0L
-                                    break
-                                }
-                            } else {
-                                daysToAdd = i
-                                break
-                            }
-                        }
-                    }
-
-                    if (daysToAdd != null) {
-                        val targetDate = todayDate.plusDays(daysToAdd)
-                        val startHour = schedule.startMinute / 60
-                        val startMin = schedule.startMinute % 60
-
-                        val startMillis = targetDate.atTime(startHour, startMin)
-                            .atZone(zoneId)
-                            .toInstant()
-                            .toEpochMilli()
-
-                        if (closestStartMillis == null || startMillis < closestStartMillis) {
-                            closestStartMillis = startMillis
-                        }
-                    }
-                }
-
-                return@withWriteTransaction closestStartMillis
+                val closestStartMillis = getNextPlainScheduleStartTimeMillis(nowMillis)
+                val courseNext = CourseScheduleResolver.findNextStart(
+                    loadCourseScheduleData(nowMillis),
+                    nowMillis
+                )
+                return@withWriteTransaction listOfNotNull(closestStartMillis, courseNext).minOrNull()
             }
         }
+
+    private suspend fun getNextPlainScheduleStartTimeMillis(nowMillis: Long): Long? {
+        val allActive = dao.getAllActiveSchedulesBasic()
+        if (allActive.isEmpty()) return null
+
+        val zoneId = ZoneId.systemDefault()
+        val now = Instant.ofEpochMilli(nowMillis).atZone(zoneId)
+        val todayDate = now.toLocalDate()
+        val currentMinute = now.hour * 60 + now.minute
+
+        var closestStartMillis: Long? = null
+
+        for (schedule in allActive) {
+            if (schedule.daysOfWeek.isEmpty()) continue
+
+            var daysToAdd: Long? = null
+
+            for (i in 0L..7L) {
+                val targetLocalDate = todayDate.plusDays(i)
+                val checkDayOfWeek = targetLocalDate.dayOfWeek
+
+                if (schedule.daysOfWeek.contains(checkDayOfWeek)) {
+                    if (i == 0L) {
+                        if (currentMinute < schedule.startMinute) {
+                            daysToAdd = 0L
+                            break
+                        }
+                    } else {
+                        daysToAdd = i
+                        break
+                    }
+                }
+            }
+
+            if (daysToAdd != null) {
+                val targetDate = todayDate.plusDays(daysToAdd)
+                val startHour = schedule.startMinute / 60
+                val startMin = schedule.startMinute % 60
+
+                val startMillis = targetDate.atTime(startHour, startMin)
+                    .atZone(zoneId)
+                    .toInstant()
+                    .toEpochMilli()
+
+                if (closestStartMillis == null || startMillis < closestStartMillis) {
+                    closestStartMillis = startMillis
+                }
+            }
+        }
+
+        return closestStartMillis
+    }
 
     val invalidationTracker: InvalidationTracker
         get() = database.invalidationTracker

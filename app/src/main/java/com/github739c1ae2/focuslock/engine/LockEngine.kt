@@ -157,7 +157,18 @@ class LockEngine(
 
         engineScope.launch {
             repository.invalidationTracker
-                .createFlow("schedules", "quick_lock", emitInitialState = true)
+                .createFlow(
+                    "schedules",
+                    "quick_lock",
+                    "course_tables",
+                    "course_time_slots",
+                    "course_seasonal_schedules",
+                    "course_seasonal_time_slots",
+                    "courses",
+                    "course_sessions",
+                    "course_session_skips",
+                    emitInitialState = true
+                )
                 .collect {
                     Log.d(TAG, "数据库发生变化，发送重估事件")
                     eventChannel.send(EngineEvent.DatabaseChanged)
@@ -521,18 +532,18 @@ class LockEngine(
     }
 
     private suspend fun setIdle() {
-        if (engineState.value is EngineState.Idle) {
-            return
+        if (engineState.value !is EngineState.Idle) {
+            (engineState.value as? EngineState.InSession)?.session?.let {
+                repository.completeSession(it)
+            }
+            countdownJob?.cancel()
+            countdownJob = null
+            timeTriggerJob?.cancel()
+            timeTriggerJob = null
+            engineState.value = EngineState.Idle
+            updateAdapterInstance(StaticAdapter.PASSED)
         }
-        (engineState.value as? EngineState.InSession)?.session?.let {
-            repository.completeSession(it)
-        }
-        countdownJob?.cancel()
-        countdownJob = null
-        timeTriggerJob?.cancel()
-        timeTriggerJob = null
-        engineState.value = EngineState.Idle
-        updateAdapterInstance(StaticAdapter.PASSED)
+        // 即使已经处于 Idle，也要（重新）安排下一次唤醒，确保冷启动后课程/时间段能按时生效
         scheduleNextWakeup()
     }
 

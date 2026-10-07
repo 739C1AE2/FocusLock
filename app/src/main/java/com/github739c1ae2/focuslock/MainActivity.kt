@@ -50,6 +50,10 @@ import com.github739c1ae2.focuslock.ui.navigation.scene.AdaptiveDialogSceneStrat
 import com.github739c1ae2.focuslock.ui.navigation.scene.rememberAdaptiveDialogSceneStrategy
 import com.github739c1ae2.focuslock.ui.navigation.scene.rememberBackInterceptionSceneDecoratorStrategy
 import com.github739c1ae2.focuslock.ui.screen.adapter.AdapterConfigScreen
+import com.github739c1ae2.focuslock.ui.screen.course.CourseEditorScreen
+import com.github739c1ae2.focuslock.ui.screen.course.CourseListScreen
+import com.github739c1ae2.focuslock.ui.screen.course.CourseTableSettingsScreen
+import com.github739c1ae2.focuslock.ui.screen.course.TimeTableEditorScreen
 import com.github739c1ae2.focuslock.ui.screen.home.HomeScreen
 import com.github739c1ae2.focuslock.ui.screen.profile.AdapterConfigResult
 import com.github739c1ae2.focuslock.ui.screen.profile.ProfileEditScreen
@@ -191,6 +195,12 @@ fun MainApp() {
                                 anchor = key,
                                 target = AppRoute.ScheduleEditor(scheduleId)
                             )
+                        },
+                        onOpenCourseTable = {
+                            navigator.popToAndPush(
+                                anchor = key,
+                                target = AppRoute.CourseTable
+                            )
                         }
                     )
                 }
@@ -301,6 +311,85 @@ fun MainApp() {
                         onProfileCreated = { profileId ->
                             navigator.navigate(AppRoute.ProfileEditor(profileId))
                         }
+                    )
+                }
+                entry<AppRoute.CourseTable>(
+                    metadata = ListDetailSceneStrategy.detailPane(sceneKey = "Schedule")
+                ) { key ->
+                    val isSinglePane = LocalListDetailSceneScope.current == null
+                    CourseListScreen(
+                        isSinglePane = isSinglePane,
+                        onBack = { navigator.safeGoBack(key) },
+                        onEditCourse = { courseId ->
+                            navigator.popToAndPush(
+                                anchor = key,
+                                target = AppRoute.CourseEditor(courseId)
+                            )
+                        },
+                        onOpenSettings = {
+                            navigator.popToAndPush(
+                                anchor = key,
+                                target = AppRoute.CourseTableSettings
+                            )
+                        }
+                    )
+                }
+                entry<AppRoute.CourseEditor>(
+                    metadata = ListDetailSceneStrategy.detailPane(sceneKey = "Schedule")
+                ) { key ->
+                    val isListDetailScene = LocalListDetailSceneScope.current != null
+                    CourseEditorScreen(
+                        courseId = key.courseId,
+                        isSinglePane = !isListDetailScene,
+                        onBack = { navigator.safeGoBack(key) },
+                        onDirtyChange = { navigator.setRouteDirty(key, it) },
+                        onSaved = {
+                            if (!isListDetailScene) {
+                                navigator.forceGoBack(key)
+                            }
+                        },
+                        onDeleted = { navigator.forceGoBack(key) },
+                        onProfileCreated = { profileId ->
+                            navigator.navigate(AppRoute.ProfileEditor(profileId))
+                        }
+                    )
+                }
+                entry<AppRoute.CourseTableSettings>(
+                    metadata = ListDetailSceneStrategy.detailPane(sceneKey = "Schedule")
+                ) { key ->
+                    val isListDetailScene = LocalListDetailSceneScope.current != null
+                    CourseTableSettingsScreen(
+                        isSinglePane = !isListDetailScene,
+                        onBack = { navigator.safeGoBack(key) },
+                        onDirtyChange = { navigator.setRouteDirty(key, it) },
+                        onSaved = {
+                            if (!isListDetailScene) {
+                                navigator.forceGoBack(key)
+                            }
+                        },
+                        onOpenTimeTable = { timeTableId ->
+                            navigator.popToAndPush(
+                                anchor = key,
+                                target = AppRoute.TimeTableEditor(timeTableId)
+                            )
+                        }
+                    )
+                }
+                entry<AppRoute.TimeTableEditor>(
+                    metadata = ListDetailSceneStrategy.detailPane(sceneKey = "Schedule")
+                ) { key ->
+                    val isListDetailScene = LocalListDetailSceneScope.current != null
+                    TimeTableEditorScreen(
+                        timeTableId = key.timeTableId,
+                        isSinglePane = !isListDetailScene,
+                        onBack = { navigator.safeGoBack(key) },
+                        onDirtyChange = { navigator.setRouteDirty(key, it) },
+                        onSaved = {
+                            if (!isListDetailScene) {
+                                navigator.forceGoBack(key)
+                            }
+                        },
+                        onDeleted = { navigator.forceGoBack(key) }
                     )
                 }
                 entry<AppRoute.AdapterConfigEditor>(

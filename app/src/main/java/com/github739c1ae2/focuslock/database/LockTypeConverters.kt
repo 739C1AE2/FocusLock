@@ -50,4 +50,28 @@ class LockTypeConverters {
             .toSet()
     }
 
+    @ColumnTypeConverter
+    fun fromDayOfWeek(day: DayOfWeek): Int {
+        return day.value
+    }
+
+    @ColumnTypeConverter
+    fun toDayOfWeek(value: Int): DayOfWeek {
+        return DayOfWeek.of(value.coerceIn(1, 7))
+    }
+
+    @ColumnTypeConverter
+    fun fromIntSet(values: Set<Int>?): String {
+        if (values.isNullOrEmpty()) return ""
+        return values.sorted().joinToString(",")
+    }
+
+    @ColumnTypeConverter
+    fun toIntSet(data: String?): Set<Int> {
+        if (data.isNullOrBlank()) return emptySet()
+        return data.split(",")
+            .mapNotNull { it.toIntOrNull() }
+            .toSet()
+    }
+
 }

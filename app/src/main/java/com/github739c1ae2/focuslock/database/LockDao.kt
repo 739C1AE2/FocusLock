@@ -6,9 +6,11 @@ import androidx.room3.Embedded
 import androidx.room3.Insert
 import androidx.room3.OnConflictStrategy
 import androidx.room3.Query
+import androidx.room3.Relation
 import androidx.room3.Transaction
 import androidx.room3.Update
 import kotlinx.coroutines.flow.Flow
+import java.time.DayOfWeek
 
 @Dao
 interface LockDao {
@@ -156,10 +158,181 @@ interface LockDao {
     @Query("SELECT * FROM profile_app_rules WHERE profileId = :profileId")
     suspend fun getRulesByProfileId(profileId: Long): List<ProfileAppRuleEntity>
 
+    // ---------------- 课程表 ----------------
+
+    @Query("SELECT * FROM course_tables WHERE id = :id LIMIT 1")
+    suspend fun getCourseTable(id: Long = COURSE_TABLE_ID): CourseTableEntity?
+
+    @Query("SELECT * FROM course_tables WHERE id = :id LIMIT 1")
+    fun observeCourseTable(id: Long = COURSE_TABLE_ID): Flow<CourseTableEntity?>
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertCourseTable(courseTable: CourseTableEntity)
+
+    @Transaction
+    suspend fun initializeCourseTable(courseTableName: String, baseTimeTableName: String) {
+        if (getCourseTable() == null) {
+            insertCourseTable(CourseTableEntity(id = COURSE_TABLE_ID, name = courseTableName))
+        }
+        if (getBaseTimeTable() == null) {
+            insertTimeTable(
+                CourseTimeTableEntity(
+                    id = BASE_TIME_TABLE_ID,
+                    courseTableId = COURSE_TABLE_ID,
+                    name = baseTimeTableName,
+                    isBase = true
+                )
+            )
+        }
+    }
+
+    @Query(
+        """
+        UPDATE course_tables SET
+            name = :name,
+            semesterStartEpochDay = :semesterStartEpochDay,
+            semesterTotalWeeks = :semesterTotalWeeks,
+            firstDayOfWeek = :firstDayOfWeek,
+            defaultClassDuration = :defaultClassDuration,
+            defaultBreakDuration = :defaultBreakDuration
+        WHERE id = :id
+        """
+    )
+    suspend fun updateCourseTable(
+        id: Long,
+        name: String,
+        semesterStartEpochDay: Long?,
+        semesterTotalWeeks: Int,
+        firstDayOfWeek: DayOfWeek,
+        defaultClassDuration: Int,
+        defaultBreakDuration: Int
+    ): Int
+
+    @Query("DELETE FROM course_tables WHERE id = :id")
+    suspend fun deleteCourseTable(id: Long = COURSE_TABLE_ID)
+
+    // ---------------- 作息表 ----------------
+
+    @Query("SELECT * FROM course_time_tables WHERE courseTableId = :courseTableId ORDER BY isBase DESC, id ASC")
+    suspend fun getTimeTables(courseTableId: Long = COURSE_TABLE_ID): List<CourseTimeTableEntity>
+
+    @Query("SELECT * FROM course_time_tables WHERE courseTableId = :courseTableId ORDER BY isBase DESC, id ASC")
+    fun observeTimeTables(courseTableId: Long = COURSE_TABLE_ID): Flow<List<CourseTimeTableEntity>>
+
+    @Query("SELECT * FROM course_time_tables WHERE id = :id LIMIT 1")
+    suspend fun getTimeTable(id: Long): CourseTimeTableEntity?
+
+    @Query("SELECT * FROM course_time_tables WHERE courseTableId = :courseTableId AND isBase = 1 LIMIT 1")
+    suspend fun getBaseTimeTable(courseTableId: Long = COURSE_TABLE_ID): CourseTimeTableEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertTimeTable(timeTable: CourseTimeTableEntity): Long
+
+    @Query("DELETE FROM course_time_tables WHERE id = :id")
+    suspend fun deleteTimeTable(id: Long)
+
+    @Query("DELETE FROM course_time_tables WHERE courseTableId = :courseTableId")
+    suspend fun deleteTimeTables(courseTableId: Long = COURSE_TABLE_ID)
+
+    @Query("SELECT * FROM course_time_slots WHERE timeTableId = :timeTableId ORDER BY number ASC")
+    suspend fun getSlotsByTimeTable(timeTableId: Long): List<CourseTimeSlotEntity>
+
+    @Query("SELECT * FROM course_time_slots WHERE courseTableId = :courseTableId")
+    suspend fun getAllTimeSlots(courseTableId: Long = COURSE_TABLE_ID): List<CourseTimeSlotEntity>
+
+    @Query("SELECT * FROM course_time_slots WHERE courseTableId = :courseTableId")
+    fun observeAllTimeSlots(courseTableId: Long = COURSE_TABLE_ID): Flow<List<CourseTimeSlotEntity>>
+
+    @Query("DELETE FROM course_time_slots WHERE timeTableId = :timeTableId")
+    suspend fun deleteSlotsByTimeTable(timeTableId: Long)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertTimeSlots(slots: List<CourseTimeSlotEntity>)
+
+    @Query(
+        """
+        SELECT courses.*, profiles.name AS profileName,
+            (SELECT COUNT(*) FROM course_sessions WHERE courseId = courses.id) AS sessionCount
+        FROM courses
+        INNER JOIN profiles ON courses.profileId = profiles.id
+        WHERE courses.courseTableId = :courseTableId
+        ORDER BY courses.id ASC
+        """
+    )
+    fun observeCourseList(courseTableId: Long = COURSE_TABLE_ID): Flow<List<CourseListItem>>
+
+    @Transaction
+    @Query("SELECT * FROM courses WHERE courseTableId = :courseTableId ORDER BY id ASC")
+    suspend fun getCoursesWithSessions(courseTableId: Long = COURSE_TABLE_ID): List<CourseWithSessions>
+
+    @Transaction
+    @Query("SELECT * FROM courses WHERE isActive = 1 AND courseTableId = :courseTableId")
+    suspend fun getActiveCoursesWithSessions(courseTableId: Long = COURSE_TABLE_ID): List<CourseWithSessions>
+
+    @Transaction
+    @Query("SELECT * FROM courses WHERE id = :id LIMIT 1")
+    suspend fun getCourseWithSessions(id: Long): CourseWithSessions?
+
+    @Query("SELECT * FROM courses WHERE id = :id LIMIT 1")
+    suspend fun getCourseById(id: Long): CourseEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertCourse(course: CourseEntity): Long
+
+    @Query("DELETE FROM courses WHERE id = :id")
+    suspend fun deleteCourseById(id: Long)
+
+    @Query("DELETE FROM courses WHERE courseTableId = :courseTableId")
+    suspend fun deleteCourses(courseTableId: Long = COURSE_TABLE_ID)
+
+    @Query("UPDATE courses SET isActive = :isActive WHERE id = :courseId")
+    suspend fun updateCourseActiveStatus(courseId: Long, isActive: Boolean)
+
+    @Query("SELECT * FROM course_sessions WHERE courseId = :courseId ORDER BY id ASC")
+    suspend fun getSessionsByCourseId(courseId: Long): List<CourseSessionEntity>
+
+    @Query("DELETE FROM course_sessions WHERE courseId = :courseId")
+    suspend fun deleteSessionsByCourseId(courseId: Long)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertSessions(sessions: List<CourseSessionEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertSkip(skip: CourseSessionSkipEntity)
+
+    @Query("SELECT sessionId FROM course_session_skips WHERE skipEpochDay = :epochDay")
+    suspend fun getSkippedSessionIdsForDay(epochDay: Long): List<Long>
+
+    @Query("SELECT sessionId FROM course_session_skips WHERE skipEpochDay = :epochDay")
+    fun observeSkippedSessionIdsForDay(epochDay: Long): Flow<List<Long>>
+
+    @Query("DELETE FROM course_session_skips WHERE skipEpochDay < :epochDay")
+    suspend fun deleteSkipsBefore(epochDay: Long)
+
+    @Query("DELETE FROM course_session_skips WHERE sessionId = :sessionId")
+    suspend fun deleteSkipsBySession(sessionId: Long)
+
+    @Transaction
+    suspend fun replaceCourseSessions(courseId: Long, sessions: List<CourseSessionEntity>) {
+        deleteSessionsByCourseId(courseId)
+        insertSessions(sessions)
+    }
+
 }
 
 
 data class ScheduleWithProfileName(
     @Embedded val schedule: ScheduleEntity,
     @ColumnInfo(name = "profileName") val profileName: String
+)
+
+data class CourseWithSessions(
+    @Embedded val course: CourseEntity,
+    @Relation(parentColumns = ["id"], entityColumns = ["courseId"]) val sessions: List<CourseSessionEntity>
+)
+
+data class CourseListItem(
+    @Embedded val course: CourseEntity,
+    @ColumnInfo(name = "profileName") val profileName: String,
+    @ColumnInfo(name = "sessionCount") val sessionCount: Int
 )

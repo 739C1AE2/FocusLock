@@ -32,6 +32,18 @@ sealed interface AppRoute : NavKey {
     data class ScheduleEditor(val scheduleId: Long) : AppRoute
 
     @Serializable
+    data object CourseTable : AppRoute
+
+    @Serializable
+    data class CourseEditor(val courseId: Long) : AppRoute
+
+    @Serializable
+    data object CourseTableSettings : AppRoute
+
+    @Serializable
+    data class TimeTableEditor(val timeTableId: Long) : AppRoute
+
+    @Serializable
     data class ProfileEditor(val profileId: Long) : AppRoute
 
     @Serializable

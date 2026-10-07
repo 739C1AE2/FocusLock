@@ -18,14 +18,8 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenu
-import androidx.compose.material3.ExposedDropdownMenuAnchorType
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -54,6 +48,7 @@ import androidx.lifecycle.compose.dropUnlessResumed
 import com.github739c1ae2.focuslock.R
 import com.github739c1ae2.focuslock.database.ProfileEntity
 import com.github739c1ae2.focuslock.ui.components.InputDialog
+import com.github739c1ae2.focuslock.ui.components.ProfileDropdown
 import com.github739c1ae2.focuslock.ui.components.TimeOfDayPickerDialog
 import com.github739c1ae2.focuslock.util.ValidatedField
 import com.github739c1ae2.focuslock.util.calculateImeAwareScaffoldInsets
@@ -383,56 +378,3 @@ private fun FormPreview() {
     )
 }
 
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun ProfileDropdown(
-    profiles: List<ProfileEntity>,
-    selectedId: Long,
-    onSelect: (Long) -> Unit,
-    onNewProfile: () -> Unit
-) {
-    var expanded by remember { mutableStateOf(false) }
-    val selectedName = profiles.firstOrNull { it.id == selectedId }?.name
-        ?: selectedId.toString()
-
-    ExposedDropdownMenuBox(
-        expanded = expanded,
-        onExpandedChange = { expanded = it }
-    ) {
-        OutlinedTextField(
-            value = selectedName,
-            onValueChange = {},
-            readOnly = true,
-            singleLine = true,
-            label = { Text(stringResource(R.string.profile_binding)) },
-            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-            colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
-            modifier = Modifier
-                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
-                .fillMaxWidth()
-        )
-        ExposedDropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false }
-        ) {
-            profiles.forEach { profile ->
-                DropdownMenuItem(
-                    text = { Text(profile.name) },
-                    onClick = {
-                        onSelect(profile.id)
-                        expanded = false
-                    }
-                )
-            }
-            HorizontalDivider()
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.create_profile)) },
-                onClick = {
-                    expanded = false
-                    onNewProfile()
-                }
-            )
-        }
-    }
-}

@@ -21,7 +21,13 @@ import javax.inject.Singleton
         ProfileEntity::class,
         QuickLockEntity::class,
         ProfileAppRuleEntity::class,
-        ScheduleEntity::class
+        ScheduleEntity::class,
+        CourseTableEntity::class,
+        CourseTimeTableEntity::class,
+        CourseTimeSlotEntity::class,
+        CourseEntity::class,
+        CourseSessionEntity::class,
+        CourseSessionSkipEntity::class
     ],
     version = 2,
     exportSchema = false
@@ -61,7 +67,13 @@ object DatabaseModule {
     @Singleton
     fun provideLockDao(@ApplicationContext context: Context, database: AppDatabase): LockDao {
         runBlocking {
-            database.lockDao().initializeOrUpdateGlobalProfile(context.getString(R.string.global_profile_name))
+            database.lockDao().apply {
+                initializeOrUpdateGlobalProfile(context.getString(R.string.global_profile_name))
+                initializeCourseTable(
+                    courseTableName = context.getString(R.string.course_table_title),
+                    baseTimeTableName = context.getString(R.string.base_time_table_name)
+                )
+            }
         }
         return database.lockDao()
     }
