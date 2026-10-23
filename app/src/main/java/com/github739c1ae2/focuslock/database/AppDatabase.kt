@@ -7,6 +7,7 @@ import androidx.room3.Room
 import androidx.room3.RoomDatabase
 import androidx.room3.migration.Migration
 import androidx.sqlite.SQLiteConnection
+import androidx.sqlite.execSQL
 import com.github739c1ae2.focuslock.R
 import dagger.Module
 import dagger.Provides
@@ -28,7 +29,7 @@ import javax.inject.Singleton
         CourseEntity::class,
         CourseSessionEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 @ColumnTypeConverters(LockTypeConverters::class)
@@ -48,7 +49,83 @@ val MIGRATION_1_2 = object : Migration(1, 2) {
     }
 }
 
-// FIXME: 升级数据库版本号并编写迁移脚本
+val MIGRATION_2_3 = object : Migration(2, 3) {
+    override suspend fun migrate(connection: SQLiteConnection) {
+        connection.execSQL("""
+            CREATE TABLE IF NOT EXISTS `course_tables` (
+                `id` INTEGER NOT NULL,
+                `name` TEXT NOT NULL,
+                `semesterStartEpochDay` INTEGER,
+                `semesterTotalWeeks` INTEGER NOT NULL,
+                `firstDayOfWeek` INTEGER NOT NULL,
+                PRIMARY KEY(`id`)
+            )
+        """.trimIndent())
+        connection.execSQL("""
+            CREATE TABLE IF NOT EXISTS `course_time_tables` (
+                `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                `courseTableId` INTEGER NOT NULL,
+                `name` TEXT NOT NULL,
+                `isBase` INTEGER NOT NULL DEFAULT 0,
+                `startEpochDay` INTEGER NOT NULL,
+                `endEpochDay` INTEGER NOT NULL,
+                FOREIGN KEY(`courseTableId`) REFERENCES `course_tables`(`id`)
+                    ON UPDATE NO ACTION ON DELETE CASCADE
+            )
+        """.trimIndent())
+        connection.execSQL("CREATE INDEX IF NOT EXISTS `index_course_time_tables_courseTableId` ON `course_time_tables` (`courseTableId`)")
+        connection.execSQL("""
+            CREATE TABLE IF NOT EXISTS `course_time_slots` (
+                `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                `courseTableId` INTEGER NOT NULL,
+                `timeTableId` INTEGER NOT NULL,
+                `number` INTEGER NOT NULL,
+                `startMinute` INTEGER NOT NULL,
+                `endMinute` INTEGER NOT NULL,
+                `alias` TEXT NOT NULL,
+                FOREIGN KEY(`courseTableId`) REFERENCES `course_tables`(`id`)
+                    ON UPDATE NO ACTION ON DELETE CASCADE,
+                FOREIGN KEY(`timeTableId`) REFERENCES `course_time_tables`(`id`)
+                    ON UPDATE NO ACTION ON DELETE CASCADE
+            )
+        """.trimIndent())
+        connection.execSQL("CREATE INDEX IF NOT EXISTS `index_course_time_slots_courseTableId` ON `course_time_slots` (`courseTableId`)")
+        connection.execSQL("CREATE INDEX IF NOT EXISTS `index_course_time_slots_timeTableId` ON `course_time_slots` (`timeTableId`)")
+        connection.execSQL("""
+            CREATE TABLE IF NOT EXISTS `courses` (
+                `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                `courseTableId` INTEGER NOT NULL,
+                `name` TEXT NOT NULL,
+                `profileId` INTEGER NOT NULL DEFAULT 1,
+                `isActive` INTEGER NOT NULL,
+                FOREIGN KEY(`courseTableId`) REFERENCES `course_tables`(`id`)
+                    ON UPDATE NO ACTION ON DELETE CASCADE,
+                FOREIGN KEY(`profileId`) REFERENCES `profiles`(`id`)
+                    ON UPDATE NO ACTION ON DELETE SET DEFAULT
+            )
+        """.trimIndent())
+        connection.execSQL("CREATE INDEX IF NOT EXISTS `index_courses_courseTableId` ON `courses` (`courseTableId`)")
+        connection.execSQL("CREATE INDEX IF NOT EXISTS `index_courses_profileId` ON `courses` (`profileId`)")
+        connection.execSQL("""
+            CREATE TABLE IF NOT EXISTS `course_sessions` (
+                `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                `courseId` INTEGER NOT NULL,
+                `dayOfWeek` INTEGER NOT NULL,
+                `teacher` TEXT NOT NULL,
+                `position` TEXT NOT NULL,
+                `isCustomTime` INTEGER NOT NULL,
+                `startSection` INTEGER,
+                `endSection` INTEGER,
+                `customStartMinute` INTEGER,
+                `customEndMinute` INTEGER,
+                `weeks` TEXT NOT NULL,
+                FOREIGN KEY(`courseId`) REFERENCES `courses`(`id`)
+                    ON UPDATE NO ACTION ON DELETE CASCADE
+            )
+        """.trimIndent())
+        connection.execSQL("CREATE INDEX IF NOT EXISTS `index_course_sessions_courseId` ON `course_sessions` (`courseId`)")
+    }
+}
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -61,7 +138,7 @@ object DatabaseModule {
             context,
             AppDatabase::class.java,
             "app_database"
-        ).addMigrations(MIGRATION_1_2)
+        ).addMigrations(MIGRATION_1_2, MIGRATION_2_3)
             .build()
     }
 
