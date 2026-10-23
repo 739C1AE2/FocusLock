@@ -22,7 +22,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenu
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -59,7 +58,6 @@ import com.github739c1ae2.focuslock.R
 import com.github739c1ae2.focuslock.database.ProfileEntity
 import com.github739c1ae2.focuslock.ui.components.InputDialog
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     modifier: Modifier = Modifier,
@@ -180,6 +178,7 @@ fun AccessibilityBanner(isRunning: Boolean, onOpenSettings: () -> Unit) {
     }
 }
 
+@Suppress("SameParameterValue")
 fun Modifier.fillMaxSquare(
     @FloatRange(from = 0.0, to = 1.0, fromInclusive = false) scaleRatio: Float = 1.0f,
     minSize: Dp = Dp.Unspecified,
@@ -263,7 +262,6 @@ fun StartButton(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun QuickLockConfigPanel(
     selectedProfileId: Long,

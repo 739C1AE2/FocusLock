@@ -30,7 +30,6 @@ import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material.icons.outlined.Window
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
@@ -67,7 +66,6 @@ import com.github739c1ae2.focuslock.R
 import com.github739c1ae2.focuslock.ui.navigation.AppRoute
 import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     selectedRoute: AppRoute.SettingsDetail?,

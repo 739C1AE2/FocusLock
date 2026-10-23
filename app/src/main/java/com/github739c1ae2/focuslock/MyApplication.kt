@@ -1,6 +1,7 @@
 package com.github739c1ae2.focuslock
 
 import android.app.Application
+import android.util.Log
 import coil3.ImageLoader
 import coil3.PlatformContext
 import coil3.SingletonImageLoader
@@ -8,6 +9,9 @@ import com.github739c1ae2.focuslock.datastore.AppSettingsManager
 import com.github739c1ae2.focuslock.guard.AccessibilityGuard
 import com.github739c1ae2.focuslock.util.AppIconFetcher
 import dagger.hilt.android.HiltAndroidApp
+import java.time.DayOfWeek
+import java.time.format.TextStyle
+import java.util.Locale
 import javax.inject.Inject
 
 @HiltAndroidApp

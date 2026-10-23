@@ -100,7 +100,7 @@ class ProfileEditViewModel @AssistedInject constructor(
     val uiState: StateFlow<UiState>
         field = MutableStateFlow<UiState>(UiState.Loading)
 
-    val schedules = repository.observeSchedulesForProfile(profileId)
+    val schedules = repository.observeScheduleEntitiesForProfile(profileId)
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
@@ -116,7 +116,7 @@ class ProfileEditViewModel @AssistedInject constructor(
 
     fun load() {
         viewModelScope.launch {
-            val config = repository.getCompleteProfile(profileId)
+            val config = repository.getProfile(profileId)
             val pm = context.packageManager
 
             val rules = config.rules.values.map { rule ->
@@ -249,7 +249,7 @@ class ProfileEditViewModel @AssistedInject constructor(
         val state = uiState.value
         if (state !is UiState.Loaded) return
         viewModelScope.launch {
-            repository.saveCompleteProfile(
+            repository.upsertProfile(
                 state.profile.toProfileConfig()
             )
             eventFlow.emit(UiEvent.ProfileSaved)

@@ -3,6 +3,7 @@ package com.github739c1ae2.focuslock.util
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalLocale
 import java.time.Instant
+import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -27,4 +28,12 @@ fun Long.timestampMillisToClockString(style: FormatStyle = FormatStyle.SHORT): S
         .atZone(ZoneId.systemDefault())
         .toLocalTime()
         .format(formatter)
+}
+
+@Composable
+fun Long.epochDayToDateString(style: FormatStyle = FormatStyle.MEDIUM): String {
+    val date = LocalDate.ofEpochDay(this)
+    val formatter = DateTimeFormatter.ofLocalizedDate(style)
+        .withLocale(LocalLocale.current.platformLocale)
+    return date.format(formatter)
 }

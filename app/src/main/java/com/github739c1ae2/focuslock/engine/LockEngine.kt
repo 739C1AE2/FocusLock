@@ -15,10 +15,15 @@ import com.github739c1ae2.focuslock.adapter.AdapterLockState
 import com.github739c1ae2.focuslock.adapter.AppAdapter
 import com.github739c1ae2.focuslock.adapter.StaticAdapter
 import com.github739c1ae2.focuslock.database.ActiveLockSession
+import com.github739c1ae2.focuslock.database.AppDatabase
 import com.github739c1ae2.focuslock.database.AppRuleMode
 import com.github739c1ae2.focuslock.database.LockRepository
+import com.github739c1ae2.focuslock.database.LockSessionUseCase
 import com.github739c1ae2.focuslock.datastore.AppSettingsManager
 import com.github739c1ae2.focuslock.datastore.UnlockUsageManager
+import dagger.assisted.Assisted
+import dagger.assisted.AssistedFactory
+import dagger.assisted.AssistedInject
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -45,12 +50,14 @@ import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
 
-class LockEngine(
-    private val service: AccessibilityService,
+class LockEngine @AssistedInject constructor(
+    private val database: AppDatabase,
+    private val useCase: LockSessionUseCase,
     private val repository: LockRepository,
     settingsManager: AppSettingsManager,
     private val unlockUsageManager: UnlockUsageManager,
-    private val onError: (Throwable) -> Unit
+    @Assisted private val service: AccessibilityService,
+    @Assisted private val onError: (Throwable) -> Unit,
 ) {
     companion object {
         private const val TAG = "LockEngine"
@@ -144,6 +151,7 @@ class LockEngine(
                                 deduped.add(event)
                             }
                         }
+
                         else -> {
                             deduped.add(event)
                         }
@@ -156,8 +164,17 @@ class LockEngine(
         }
 
         engineScope.launch {
-            repository.invalidationTracker
-                .createFlow("schedules", "quick_lock", emitInitialState = true)
+            database.invalidationTracker
+                .createFlow(
+                    "schedules",
+                    "quick_lock",
+                    "course_tables",
+                    "course_time_tables",
+                    "course_time_slots",
+                    "courses",
+                    "course_sessions",
+                    emitInitialState = true
+                )
                 .collect {
                     Log.d(TAG, "数据库发生变化，发送重估事件")
                     eventChannel.send(EngineEvent.DatabaseChanged)
@@ -296,9 +313,9 @@ class LockEngine(
         val state = engineState.value
         val oldSession = (state as? EngineState.InSession)?.session
         if (forceReloadSession || oldSession == null || System.currentTimeMillis() >= oldSession.endTimeMillis) {
-            val session = repository.getActiveSession()
+            val session = useCase.getActiveSession()
             if (session == null) {
-                setIdle()
+                setIdle(forceReloadSession)
                 return
             }
             if (oldSession != session) {
@@ -341,7 +358,7 @@ class LockEngine(
         countdownJob = null
 
         oldSession?.let {
-            repository.completeSession(it)
+            useCase.completeSession(it)
         }
 
         engineState.value = EngineState.InSession(session, SessionState.Allowed)
@@ -351,7 +368,7 @@ class LockEngine(
         // 将适配器更新为当前时段的
         updateAdapter()
         // 通知用量统计模块，以重置暂停额度
-        unlockUsageManager.updateSession(session)
+        unlockUsageManager.onSessionChanged(session)
 
         if (oldSession == null) {
             // 之前没有 Session，说明是从空闲状态进入了 Session，需要启动警告倒计时
@@ -367,7 +384,7 @@ class LockEngine(
             updateAdapterInstance(StaticAdapter.PASSED)
             return
         }
-        val profile = requireNotNull(repository.getCompleteProfile(state.session.profileId))
+        val profile = requireNotNull(repository.getProfile(state.session.profileId))
         val rule = profile.rules[currentApp]
         if (rule?.appliedAdapterId != null) {
             val factory = AdapterFactoryRegistry.getFactoryById(rule.appliedAdapterId)
@@ -375,10 +392,8 @@ class LockEngine(
             return
         }
         val isSystemApp = isSystemApp(currentApp)
-        val locked = if (isSystemApp == null) {
-            // 无法判断是否为系统应用，为防止发生意外，默认不锁
-            false
-        } else if (rule == null) {
+        // 无法判断是否为系统应用时，为防止发生意外，默认不锁
+        val locked = isSystemApp != null && if (rule == null) {
             if (isSystemApp) {
                 profile.systemAppMode == AppRuleMode.WHITELIST
             } else {
@@ -391,6 +406,7 @@ class LockEngine(
                 profile.userAppMode == AppRuleMode.BLACKLIST
             }
         }
+        // 无法判断是否为系统应用，为防止发生意外，默认不锁
         updateAdapterInstance(
             if (locked) {
                 StaticAdapter.BLOCKED
@@ -483,7 +499,7 @@ class LockEngine(
         timeTriggerJob = null
 
         val now = System.currentTimeMillis()
-        val nextStartTime = repository.getNextScheduleStartTimeMillis(now)
+        val nextStartTime = useCase.getNextStartTimeMillis(now)
         if (nextStartTime != null) {
             val delayMs = nextStartTime - now
             if (delayMs > 0) {
@@ -515,17 +531,20 @@ class LockEngine(
         countdownJob = null
 
         (engineState.value as? EngineState.InSession)?.session?.let { session ->
-            repository.cancelSession(session)
+            useCase.cancelSession(session)
         }
         setIdle()
     }
 
-    private suspend fun setIdle() {
+    private suspend fun setIdle(forceScheduleWakeup: Boolean = false) {
         if (engineState.value is EngineState.Idle) {
+            if (forceScheduleWakeup) {
+                scheduleNextWakeup()
+            }
             return
         }
         (engineState.value as? EngineState.InSession)?.session?.let {
-            repository.completeSession(it)
+            useCase.completeSession(it)
         }
         countdownJob?.cancel()
         countdownJob = null
@@ -542,7 +561,7 @@ class LockEngine(
             val appInfo = service.packageManager.getApplicationInfo(packageName, 0)
             (appInfo.flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM) != 0
         } catch (e: Exception) {
-            Log.e(TAG, "Error while checking if $packageName is system app", e)
+            Log.e(TAG, "ImportError while checking if $packageName is system app", e)
             null
         }
         if (isSystem != null) {
@@ -571,7 +590,7 @@ class LockEngine(
         } catch (_: PackageManager.NameNotFoundException) {
             false
         } catch (e: Exception) {
-            Log.e(TAG, "Error while checking if $cacheKey is activity", e)
+            Log.e(TAG, "ImportError while checking if $cacheKey is activity", e)
             if (viewPackagePrefixes.any { className.startsWith(it) }) {
                 false
             } else if (className.endsWith("Activity")) {
@@ -584,5 +603,13 @@ class LockEngine(
             activityClassCache.put(cacheKey, isActivity)
         }
         return isActivity
+    }
+
+    @AssistedFactory
+    interface Factory {
+        fun create(
+            service: AccessibilityService,
+            onError: (Throwable) -> Unit
+        ): LockEngine
     }
 }

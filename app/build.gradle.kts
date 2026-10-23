@@ -94,6 +94,7 @@ room3 {
 }
 
 dependencies {
+    @Suppress("RedundantSuppression", "AvoidDuplicateDependencies") // https://youtrack.jetbrains.com/issue/IDEA-392673
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.adaptive.navigation3)
@@ -123,6 +124,7 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.reorderable)
     testImplementation(libs.junit)
+    @Suppress("RedundantSuppression", "AvoidDuplicateDependencies")
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.espresso.core)

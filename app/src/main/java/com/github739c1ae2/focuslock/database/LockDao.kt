@@ -8,6 +8,7 @@ import androidx.room3.OnConflictStrategy
 import androidx.room3.Query
 import androidx.room3.Transaction
 import androidx.room3.Update
+import androidx.room3.Upsert
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -30,21 +31,14 @@ interface LockDao {
         }
     }
 
-    @Insert(onConflict = OnConflictStrategy.ABORT)
-    suspend fun createCustomProfile(profile: ProfileEntity): Long
-
-    @Update
-    suspend fun updateProfile(profile: ProfileEntity)
+    @Upsert
+    suspend fun upsertProfile(profile: ProfileEntity): Long
 
     @Query("DELETE FROM profiles WHERE id = :id")
     suspend fun deleteProfileById(id: Long)
 
     @Query("SELECT * FROM profiles")
     fun observeAllProfiles(): Flow<List<ProfileEntity>>
-
-    @Query("SELECT * FROM profiles WHERE id = :id")
-    fun observeProfileById(id: Long): Flow<ProfileEntity?>
-
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertSchedule(schedule: ScheduleEntity): Long
@@ -53,16 +47,13 @@ interface LockDao {
     suspend fun updateScheduleActiveStatus(scheduleId: Long, isActive: Boolean)
 
     @Update(entity = ScheduleEntity::class)
-    suspend fun updateScheduleEditDto(schedule: ScheduleEditDto)
+    suspend fun updateScheduleDto(schedule: Schedule)
 
     @Query("DELETE FROM schedules WHERE id = :id")
     suspend fun deleteScheduleById(id: Long)
 
     @Query("SELECT * FROM schedules WHERE id = :id LIMIT 1")
     suspend fun getScheduleById(id: Long): ScheduleEntity?
-
-    @Query("UPDATE schedules SET isActive = 0 WHERE id = :scheduleId")
-    suspend fun deactivateSchedule(scheduleId: Long)
 
     @Query("""
         SELECT schedules.*, profiles.name AS profileName 
@@ -100,7 +91,7 @@ interface LockDao {
              AND :currentMinute < endMinute)
              
             OR 
-            
+             
             -- 跨天任务的前一天 (比如 22:00 到 23:59)
             -- 此时处于配置的第一天
             (startMinute > endMinute 
@@ -108,7 +99,7 @@ interface LockDao {
              AND :currentMinute >= startMinute)
              
             OR 
-            
+             
             -- 情况 3：跨天任务的后一天 (比如 00:00 到 06:00)
             -- 此时已经是第二天了，查昨天有没有配置这个任务
             (startMinute > endMinute 
@@ -144,7 +135,9 @@ interface LockDao {
     @Transaction
     suspend fun replaceProfileRules(profileId: Long, newRules: List<ProfileAppRuleEntity>) {
         deleteRulesByProfileId(profileId)
-        insertAppRules(newRules)
+        if (newRules.isNotEmpty()) {
+            insertAppRules(newRules.map { it.copy(id = 0, profileId = profileId) })
+        }
     }
 
     @Query("DELETE FROM profile_app_rules WHERE profileId = :profileId")
@@ -152,12 +145,10 @@ interface LockDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAppRules(rules: List<ProfileAppRuleEntity>)
-    
+
     @Query("SELECT * FROM profile_app_rules WHERE profileId = :profileId")
     suspend fun getRulesByProfileId(profileId: Long): List<ProfileAppRuleEntity>
-
 }
-
 
 data class ScheduleWithProfileName(
     @Embedded val schedule: ScheduleEntity,

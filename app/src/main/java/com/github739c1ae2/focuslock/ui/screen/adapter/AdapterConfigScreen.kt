@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedCard
@@ -33,11 +32,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github739c1ae2.focuslock.R
 import com.github739c1ae2.focuslock.adapter.ConfigValue
 import com.github739c1ae2.focuslock.ui.navigation.scene.AdaptiveDialogScaffold
-import com.github739c1ae2.focuslock.util.calculateImeAwareScaffoldInsets
 import com.github739c1ae2.focuslock.util.applyImeInsetsAndConsumeScaffoldPadding
+import com.github739c1ae2.focuslock.util.calculateImeAwareScaffoldInsets
 
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AdapterConfigScreen(
     packageName: String,

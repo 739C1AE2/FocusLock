@@ -49,7 +49,7 @@ class AdapterConfigViewModel @AssistedInject constructor(
 ) : ViewModel() {
 
     val state: StateFlow<UiState>
-        field = MutableStateFlow<UiState>(UiState())
+        field = MutableStateFlow(UiState())
 
     init {
         val adapters = AdapterFactoryRegistry

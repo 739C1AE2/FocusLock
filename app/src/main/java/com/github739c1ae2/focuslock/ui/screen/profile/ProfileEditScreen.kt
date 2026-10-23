@@ -23,7 +23,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -53,7 +52,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.dropUnlessResumed
+import androidx.navigation3.runtime.result.ResultEffect
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import com.github739c1ae2.focuslock.R
@@ -63,8 +64,8 @@ import com.github739c1ae2.focuslock.database.GLOBAL_PROFILE_ID
 import com.github739c1ae2.focuslock.database.ScheduleEntity
 import com.github739c1ae2.focuslock.ui.screen.adapter.AdapterConfigInfo
 import com.github739c1ae2.focuslock.util.AppIconRequest
-import com.github739c1ae2.focuslock.util.calculateImeAwareScaffoldInsets
 import com.github739c1ae2.focuslock.util.applyImeInsetsAndConsumeScaffoldPadding
+import com.github739c1ae2.focuslock.util.calculateImeAwareScaffoldInsets
 import com.github739c1ae2.focuslock.util.minutesToClockString
 import kotlinx.serialization.Serializable
 
@@ -79,7 +80,6 @@ data class AdapterConfigResult(
     val config: AdapterConfigInfo?
 )
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileEditScreen(
     profileId: Long,
@@ -89,11 +89,17 @@ fun ProfileEditScreen(
     onSaved: () -> Unit,
     onDeleted: () -> Unit,
     onConfigureAdapter: (packageName: String, original: AdapterConfigInfo?) -> Unit,
-    viewModel: ProfileEditViewModel
+    viewModel: ProfileEditViewModel = hiltViewModel<ProfileEditViewModel, ProfileEditViewModel.Factory> { factory ->
+        factory.create(profileId)
+    }
 ) {
     val state by viewModel.uiState.collectAsState()
     val schedules by viewModel.schedules.collectAsState()
     var showDeleteConfirm by remember { mutableStateOf(false) }
+
+    ResultEffect<AdapterConfigResult> { result ->
+        viewModel.handleAdapterConfigSubmitted(result)
+    }
 
     LaunchedEffect(state.isDirty) {
         onDirtyChange(state.isDirty)
@@ -202,7 +208,7 @@ fun ProfileEditScreen(
 
 
     if (showDeleteConfirm) {
-        val name = (state as? UiState.Loaded)?.profile?.name ?: profileId.toString()
+        val name = (state as? UiState.Loaded)?.profile?.name?.value ?: profileId.toString()
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
             title = { Text(stringResource(R.string.delete)) },

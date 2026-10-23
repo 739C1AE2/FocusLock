@@ -53,7 +53,7 @@ class HomeViewModel @Inject constructor(
             initialValue = EngineServiceState.Stopped
         )
 
-    val profiles: StateFlow<List<ProfileEntity>> = repository.observeAllProfiles()
+    val profiles: StateFlow<List<ProfileEntity>> = repository.observeAllProfileEntities()
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),

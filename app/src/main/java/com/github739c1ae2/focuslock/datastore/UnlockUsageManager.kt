@@ -61,7 +61,7 @@ class UnlockUsageManager @Inject constructor(
         MAX_PAUSE_DURATION_SECONDS_PER_SESSION - (prefs[PAUSE_DURATION_SECONDS_KEY] ?: 0)
     }
 
-    suspend fun updateSession(session: ActiveLockSession) {
+    suspend fun onSessionChanged(session: ActiveLockSession) {
         dataStore.edit { prefs ->
             val oldSession = prefs[PAUSE_SESSION_END_TIMESTAMP_KEY]?.toLongOrNull() ?: 0L
             if (oldSession == session.endTimeMillis) {

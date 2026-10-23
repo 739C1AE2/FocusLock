@@ -78,8 +78,8 @@ data class ScheduleEntity(
         return Pair(startTime, endTime)
     }
 
-    fun toEditDto(): ScheduleEditDto {
-        return ScheduleEditDto(
+    fun toSchedule(): Schedule {
+        return Schedule(
             id = this.id,
             name = this.name,
             daysOfWeek = this.daysOfWeek,
@@ -90,7 +90,7 @@ data class ScheduleEntity(
     }
 }
 
-data class ScheduleEditDto(
+data class Schedule(
     val id: Long = 0,
     val name: String,
     val daysOfWeek: Set<DayOfWeek>,
@@ -176,4 +176,199 @@ data class ProfileAppRuleEntity(
      * 由对应的适配器自行解析，仅在适配器 ID 不为 null 时有效。
      * */
     val adapterConfig: Map<String, ConfigValue> = emptyMap()
+)
+
+const val COURSE_TABLE_ID = 1L
+
+/**
+ * 课程表（目前仅支持一张）。
+ * 记录开学日期、周数、每周首日等信息，用于把「周次 + 星期」映射到实际日期。
+ */
+@Entity(tableName = "course_tables")
+data class CourseTableEntity(
+    @PrimaryKey val id: Long = COURSE_TABLE_ID,
+    val name: String,
+    val semesterStartEpochDay: Long? = null,
+    val semesterTotalWeeks: Int = 20,
+    val firstDayOfWeek: DayOfWeek = DayOfWeek.MONDAY
+)
+
+/**
+ * 作息时间表。基础作息 [isBase]=true、长期生效；
+ * 季节作息 [isBase]=false，按 [startEpochDay]..[endEpochDay] 生效。
+ */
+@Entity(
+    tableName = "course_time_tables",
+    foreignKeys = [
+        ForeignKey(
+            entity = CourseTableEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["courseTableId"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ],
+    indices = [Index("courseTableId")]
+)
+data class CourseTimeTableEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val courseTableId: Long = COURSE_TABLE_ID,
+    val name: String,
+    @ColumnInfo(defaultValue = "0")
+    val isBase: Boolean = false,
+    val startEpochDay: Long,
+    val endEpochDay: Long
+)
+
+/**
+ * 作息表中的一个节次时间（number -> 起止时间）。
+ */
+@Entity(
+    tableName = "course_time_slots",
+    foreignKeys = [
+        ForeignKey(
+            entity = CourseTableEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["courseTableId"],
+            onDelete = ForeignKey.CASCADE
+        ),
+        ForeignKey(
+            entity = CourseTimeTableEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["timeTableId"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ],
+    indices = [Index("courseTableId"), Index("timeTableId")]
+)
+data class CourseTimeSlotEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val courseTableId: Long = COURSE_TABLE_ID,
+    val timeTableId: Long,
+    val number: Int,
+    val startMinute: Int,
+    val endMinute: Int,
+    val alias: String = ""
+)
+
+/**
+ * 课程。同一门课可能对应多个 [CourseSessionEntity]。
+ */
+@Entity(
+    tableName = "courses",
+    foreignKeys = [
+        ForeignKey(
+            entity = CourseTableEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["courseTableId"],
+            onDelete = ForeignKey.CASCADE
+        ),
+        ForeignKey(
+            entity = ProfileEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["profileId"],
+            onDelete = ForeignKey.SET_DEFAULT
+        )
+    ],
+    indices = [Index("courseTableId"), Index("profileId")]
+)
+data class CourseEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val courseTableId: Long = COURSE_TABLE_ID,
+    val name: String,
+    @ColumnInfo(defaultValue = "$GLOBAL_PROFILE_ID")
+    val profileId: Long = GLOBAL_PROFILE_ID,
+    val isActive: Boolean = true
+)
+
+/**
+ * 课程的具体时段。一个课程可以有多个时段。
+ * - [isCustomTime] 为 true 时使用自定义起止分钟；
+ * - 否则使用 [startSection]/[endSection] 跟随作息时间表。
+ * - [weeks] 为上课周次。
+ */
+@Entity(
+    tableName = "course_sessions",
+    foreignKeys = [
+        ForeignKey(
+            entity = CourseEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["courseId"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ],
+    indices = [Index("courseId")]
+)
+data class CourseSessionEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val courseId: Long,
+    val dayOfWeek: DayOfWeek,
+    val teacher: String = "",
+    val position: String = "",
+    val isCustomTime: Boolean = false,
+    val startSection: Int? = null,
+    val endSection: Int? = null,
+    val customStartMinute: Int? = null,
+    val customEndMinute: Int? = null,
+    val weeks: Set<Int> = emptySet()
+)
+
+/** 课程时段的时间：跟随作息的节次，或自定义起止时间。 */
+sealed interface CourseSessionTime {
+    data class Sections(val startSection: Int, val endSection: Int) : CourseSessionTime
+    data class Custom(val startMinute: Int, val endMinute: Int) : CourseSessionTime
+
+    fun isValid(): Boolean {
+         return when (this) {
+            is Custom -> {
+                startMinute in 0 until 1440 &&
+                        endMinute in 1 until 1440 &&
+                        startMinute < endMinute
+            }
+            is Sections -> {
+                startSection <= endSection
+            }
+        }
+    }
+}
+
+/** 课程时段 */
+data class CourseSession(
+    val teacher: String,
+    val position: String,
+    val dayOfWeek: DayOfWeek,
+    val time: CourseSessionTime,
+    val weeks: Set<Int>
+)
+
+/** 课程 */
+data class Course(
+    val id: Long,
+    val name: String,
+    val profileId: Long,
+    val sessions: List<CourseSession>
+)
+
+/** 作息节次 */
+data class TimeSlot(
+    val number: Int,
+    val startMinute: Int,
+    val endMinute: Int,
+    val alias: String = ""
+) {
+    fun isValid(): Boolean {
+        return startMinute in 0 until 1440 &&
+                endMinute in 1 until 1440 &&
+                startMinute < endMinute
+    }
+
+}
+
+/** 作息表 */
+data class TimeTable(
+    val id: Long,
+    val name: String,
+    val isBase: Boolean,
+    val startEpochDay: Long,
+    val endEpochDay: Long,
+    val slots: List<TimeSlot>
 )

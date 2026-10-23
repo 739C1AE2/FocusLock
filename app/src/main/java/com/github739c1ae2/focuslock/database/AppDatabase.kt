@@ -21,7 +21,12 @@ import javax.inject.Singleton
         ProfileEntity::class,
         QuickLockEntity::class,
         ProfileAppRuleEntity::class,
-        ScheduleEntity::class
+        ScheduleEntity::class,
+        CourseTableEntity::class,
+        CourseTimeTableEntity::class,
+        CourseTimeSlotEntity::class,
+        CourseEntity::class,
+        CourseSessionEntity::class
     ],
     version = 2,
     exportSchema = false
@@ -29,6 +34,7 @@ import javax.inject.Singleton
 @ColumnTypeConverters(LockTypeConverters::class)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun lockDao(): LockDao
+    abstract fun courseDao(): CourseDao
 }
 
 val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -41,6 +47,8 @@ val MIGRATION_1_2 = object : Migration(1, 2) {
         ).use { it.step() }
     }
 }
+
+// FIXME: 升级数据库版本号并编写迁移脚本
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -64,5 +72,17 @@ object DatabaseModule {
             database.lockDao().initializeOrUpdateGlobalProfile(context.getString(R.string.global_profile_name))
         }
         return database.lockDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideCourseDao(@ApplicationContext context: Context, database: AppDatabase): CourseDao {
+        runBlocking {
+            database.courseDao().initializeCourseTable(
+                courseTableName = context.getString(R.string.course_table_title),
+                baseTimeTableName = context.getString(R.string.base_time_table_name)
+            )
+        }
+        return database.courseDao()
     }
 }

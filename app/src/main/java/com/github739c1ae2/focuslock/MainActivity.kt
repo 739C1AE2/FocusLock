@@ -15,6 +15,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.VerticalDragHandle
 import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfoV2
+import androidx.compose.material3.adaptive.navigation.BackNavigationBehavior
 import androidx.compose.material3.adaptive.navigation3.ListDetailSceneStrategy
 import androidx.compose.material3.adaptive.navigation3.LocalListDetailSceneScope
 import androidx.compose.material3.adaptive.navigation3.rememberListDetailSceneStrategy
@@ -30,14 +31,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
-import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.runtime.result.LocalResultEventBus
-import androidx.navigation3.runtime.result.ResultEffect
 import androidx.navigation3.runtime.result.rememberResultEventBusNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
 import androidx.window.core.layout.WindowSizeClass
@@ -50,10 +49,14 @@ import com.github739c1ae2.focuslock.ui.navigation.scene.AdaptiveDialogSceneStrat
 import com.github739c1ae2.focuslock.ui.navigation.scene.rememberAdaptiveDialogSceneStrategy
 import com.github739c1ae2.focuslock.ui.navigation.scene.rememberBackInterceptionSceneDecoratorStrategy
 import com.github739c1ae2.focuslock.ui.screen.adapter.AdapterConfigScreen
+import com.github739c1ae2.focuslock.ui.screen.course.CourseEditorScreen
+import com.github739c1ae2.focuslock.ui.screen.course.CourseListScreen
+import com.github739c1ae2.focuslock.ui.screen.course.CourseTableImportScreen
+import com.github739c1ae2.focuslock.ui.screen.course.CourseTableSettingsScreen
+import com.github739c1ae2.focuslock.ui.screen.course.TimeTableEditorScreen
 import com.github739c1ae2.focuslock.ui.screen.home.HomeScreen
 import com.github739c1ae2.focuslock.ui.screen.profile.AdapterConfigResult
 import com.github739c1ae2.focuslock.ui.screen.profile.ProfileEditScreen
-import com.github739c1ae2.focuslock.ui.screen.profile.ProfileEditViewModel
 import com.github739c1ae2.focuslock.ui.screen.profile.ProfileListScreen
 import com.github739c1ae2.focuslock.ui.screen.schedule.ScheduleEditScreen
 import com.github739c1ae2.focuslock.ui.screen.schedule.ScheduleListScreen
@@ -101,7 +104,7 @@ fun MainApp() {
     )
     val activity = LocalActivity.current!!
     val navigator = remember(navigationState) { Navigator(navigationState, activity) }
-    val listDetailStrategy: ListDetailSceneStrategy<NavKey> =  rememberListDetailSceneStrategy(
+    val listDetailStrategy: ListDetailSceneStrategy<NavKey> = rememberListDetailSceneStrategy(
         paneExpansionDragHandle = { state ->
             val interactionSource = remember { MutableInteractionSource() }
             VerticalDragHandle(
@@ -113,7 +116,8 @@ fun MainApp() {
                     ),
                 interactionSource = interactionSource,
             )
-        }
+        },
+        backNavigationBehavior = BackNavigationBehavior.PopLatest
     )
     val scaffoldState = rememberNavigationSuiteScaffoldState()
 
@@ -191,6 +195,12 @@ fun MainApp() {
                                 anchor = key,
                                 target = AppRoute.ScheduleEditor(scheduleId)
                             )
+                        },
+                        onOpenCourseTable = {
+                            navigator.popToAndPush(
+                                anchor = key,
+                                target = AppRoute.CourseTable
+                            )
                         }
                     )
                 }
@@ -241,13 +251,6 @@ fun MainApp() {
                 ) { key ->
                     val isListDetailScene = LocalListDetailSceneScope.current != null
 
-                    val viewModel =
-                        hiltViewModel<ProfileEditViewModel, ProfileEditViewModel.Factory> { factory ->
-                            factory.create(key.profileId)
-                        }
-                    ResultEffect<AdapterConfigResult> { result ->
-                        viewModel.handleAdapterConfigSubmitted(result)
-                    }
                     ProfileEditScreen(
                         profileId = key.profileId,
                         isSinglePane = !isListDetailScene,
@@ -273,8 +276,7 @@ fun MainApp() {
                                     original = original
                                 )
                             )
-                        },
-                        viewModel = viewModel
+                        }
                     )
                 }
                 entry<AppRoute.ScheduleEditor>(
@@ -301,6 +303,100 @@ fun MainApp() {
                         onProfileCreated = { profileId ->
                             navigator.navigate(AppRoute.ProfileEditor(profileId))
                         }
+                    )
+                }
+                entry<AppRoute.CourseTable>(
+                    metadata = ListDetailSceneStrategy.listPane(sceneKey = "Course")
+                ) { key ->
+                    val isSinglePane = LocalListDetailSceneScope.current == null
+                    CourseListScreen(
+                        isSinglePane = isSinglePane,
+                        onBack = { navigator.safeGoBack(key) },
+                        onEditCourse = { courseId ->
+                            navigator.popToAndPush(
+                                anchor = key,
+                                target = AppRoute.CourseEditor(courseId)
+                            )
+                        },
+                        onImportCourse = {
+                            navigator.popToAndPush(
+                                anchor = key,
+                                target = AppRoute.CourseTableImport
+                            )
+                        },
+                        onOpenSettings = {
+                            navigator.popToAndPush(
+                                anchor = key,
+                                target = AppRoute.CourseTableSettings
+                            )
+                        }
+                    )
+                }
+                entry<AppRoute.CourseTableImport>(
+                    metadata = ListDetailSceneStrategy.detailPane(sceneKey = "Course")
+                ) {
+                    val isListDetailScene = LocalListDetailSceneScope.current != null
+                    CourseTableImportScreen(
+                        isSinglePane = !isListDetailScene,
+                        onBack = { navigator.safeGoBack(it) }
+                    )
+                }
+                entry<AppRoute.CourseEditor>(
+                    metadata = ListDetailSceneStrategy.detailPane(sceneKey = "Course")
+                ) { key ->
+                    val isListDetailScene = LocalListDetailSceneScope.current != null
+                    CourseEditorScreen(
+                        courseId = key.courseId,
+                        isSinglePane = !isListDetailScene,
+                        onBack = { navigator.safeGoBack(key) },
+                        onDirtyChange = { navigator.setRouteDirty(key, it) },
+                        onSaved = {
+                            if (!isListDetailScene) {
+                                navigator.forceGoBack(key)
+                            }
+                        },
+                        onDeleted = { navigator.forceGoBack(key) },
+                        onProfileCreated = { profileId ->
+                            navigator.navigate(AppRoute.ProfileEditor(profileId))
+                        }
+                    )
+                }
+                entry<AppRoute.CourseTableSettings>(
+                    metadata = ListDetailSceneStrategy.detailPane(sceneKey = "Course")
+                ) { key ->
+                    val isListDetailScene = LocalListDetailSceneScope.current != null
+                    CourseTableSettingsScreen(
+                        isSinglePane = !isListDetailScene,
+                        onBack = { navigator.safeGoBack(key) },
+                        onDirtyChange = { navigator.setRouteDirty(key, it) },
+                        onSaved = {
+                            if (!isListDetailScene) {
+                                navigator.forceGoBack(key)
+                            }
+                        },
+                        onOpenTimeTable = { timeTableId ->
+                            navigator.popToAndPush(
+                                anchor = key,
+                                target = AppRoute.TimeTableEditor(timeTableId)
+                            )
+                        }
+                    )
+                }
+                entry<AppRoute.TimeTableEditor>(
+                    metadata = ListDetailSceneStrategy.detailPane(sceneKey = "Course")
+                ) { key ->
+                    val isListDetailScene = LocalListDetailSceneScope.current != null
+                    TimeTableEditorScreen(
+                        timeTableId = key.timeTableId,
+                        isSinglePane = !isListDetailScene,
+                        onBack = { navigator.safeGoBack(key) },
+                        onDirtyChange = { navigator.setRouteDirty(key, it) },
+                        onSaved = {
+                            if (!isListDetailScene) {
+                                navigator.forceGoBack(key)
+                            }
+                        },
+                        onDeleted = { navigator.forceGoBack(key) }
                     )
                 }
                 entry<AppRoute.AdapterConfigEditor>(

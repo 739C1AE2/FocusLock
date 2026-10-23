@@ -8,9 +8,6 @@ import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import android.widget.Toast
 import com.github739c1ae2.focuslock.R
-import com.github739c1ae2.focuslock.database.LockRepository
-import com.github739c1ae2.focuslock.datastore.AppSettingsManager
-import com.github739c1ae2.focuslock.datastore.UnlockUsageManager
 import com.github739c1ae2.focuslock.engine.LockEngine
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
@@ -26,12 +23,7 @@ class AppMonitorService : AccessibilityService() {
     }
 
     @Inject
-    lateinit var repository: LockRepository
-
-    @Inject
-    lateinit var settingsManager: AppSettingsManager
-    @Inject
-    lateinit var unlockUsageManager: UnlockUsageManager
+    lateinit var engineFactory: LockEngine.Factory
 
     private val errorTimestamps = ArrayDeque<Long>()
 
@@ -52,9 +44,8 @@ class AppMonitorService : AccessibilityService() {
 
     private fun createNewEngine() {
         engine?.destroy()
-        engine = LockEngine(
-            service = this, repository = repository,
-            settingsManager = settingsManager, unlockUsageManager = unlockUsageManager,
+        engine = engineFactory.create(
+            service = this,
             onError = { throwable ->
                 mainHandler.post {
                     handleEngineError(throwable)

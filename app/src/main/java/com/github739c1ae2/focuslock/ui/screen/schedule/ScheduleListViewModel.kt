@@ -22,7 +22,7 @@ class ScheduleListViewModel @Inject constructor(
     val createResult: SharedFlow<Long>
         field = MutableSharedFlow<Long>()
 
-    val schedules: StateFlow<List<ScheduleWithProfileName>> = repository.observeAllSchedules()
+    val schedules: StateFlow<List<ScheduleWithProfileName>> = repository.observeAllScheduleEntitiesWithProfileName()
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),

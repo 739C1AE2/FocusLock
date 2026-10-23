@@ -22,7 +22,7 @@ class ProfileListViewModel @Inject constructor(
     val createResult: SharedFlow<Long>
         field = MutableSharedFlow<Long>()
 
-    val profiles: StateFlow<List<ProfileEntity>> = repository.observeAllProfiles()
+    val profiles: StateFlow<List<ProfileEntity>> = repository.observeAllProfileEntities()
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),

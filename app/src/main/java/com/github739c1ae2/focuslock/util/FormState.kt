@@ -4,6 +4,7 @@ import androidx.annotation.StringRes
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
 
+// TODO: 重构表单校验框架
 sealed class UiText {
     data class DynamicString(val value: String) : UiText()
 

@@ -21,7 +21,6 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -51,7 +50,7 @@ sealed interface OverlayState {
     data class Warning(val remaining: Duration) : OverlayState
 }
 
-@OptIn(FlowPreview::class, ExperimentalCoroutinesApi::class)
+@OptIn(ExperimentalCoroutinesApi::class)
 class OverlayViewModel @AssistedInject constructor(
     @ApplicationContext private val context: Context,
     @Assisted private val lockEngine: LockEngine,
@@ -117,7 +116,7 @@ class OverlayViewModel @AssistedInject constructor(
     }
 
     suspend fun loadAllowedApps(profileId: Long): List<AllowedAppInfo> {
-        val profile = repository.getCompleteProfile(profileId)
+        val profile = repository.getProfile(profileId)
         val pm = context.packageManager
         val intent = Intent(Intent.ACTION_MAIN).apply {
             addCategory(Intent.CATEGORY_LAUNCHER)
@@ -128,9 +127,7 @@ class OverlayViewModel @AssistedInject constructor(
                 val appInfoFlags = it.activityInfo.applicationInfo.flags
                 val isSystemApp = (appInfoFlags and ApplicationInfo.FLAG_SYSTEM) != 0
                 if (rule != null) {
-                    if (rule.appliedAdapterId != null) {
-                        true
-                    } else if (isSystemApp) {
+                    rule.appliedAdapterId != null || if (isSystemApp) {
                         profile.systemAppMode == AppRuleMode.WHITELIST
                     } else {
                         profile.userAppMode == AppRuleMode.WHITELIST
