@@ -24,8 +24,22 @@ jobs:
           cache: gradle
 
       - name: Restore signing keystore
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        shell: bash
         run: |
-          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > "$RUNNER_TEMP/release.keystore"
+          set -euo pipefail
+          umask 077
+
+          if [[ -z "${ANDROID_KEYSTORE_BASE64:-}" ]]; then
+            echo "::error::ANDROID_KEYSTORE_BASE64 is not configured."
+            exit 1
+          fi
+
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" \
+            | base64 --decode > "$RUNNER_TEMP/release.keystore"
+
+          test -s "$RUNNER_TEMP/release.keystore"
 
       - name: Build APK
         env:
@@ -33,7 +47,9 @@ jobs:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        shell: bash
         run: |
+          set -euo pipefail
           chmod +x ./gradlew
           ./gradlew :app:assembleRelease --no-daemon
 
@@ -44,3 +60,9 @@ jobs:
           prerelease: ${{ contains(github.ref_name, '-') }}
           files: |
             app/build/outputs/apk/release/*.apk
+
+      - name: Clean up signing keystore
+        if: always()
+        shell: bash
+        run: |
+          rm -f -- "$RUNNER_TEMP/release.keystore"

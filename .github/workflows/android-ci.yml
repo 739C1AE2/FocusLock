@@ -1,0 +1,84 @@
+name: Android CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Android Lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+
+      - uses: android-actions/setup-android@v4
+
+      - run: chmod +x ./gradlew
+
+      - name: Run Android Lint
+        id: lint
+        continue-on-error: true
+        run: ./gradlew :app:lint --no-daemon
+
+      - name: Summarize Lint Findings
+        id: lint_summary
+        run: python3 .github/scripts/summarize_android_lint.py
+
+      - name: Enforce Lint quality gate
+        if: always()
+        env:
+          LINT_OUTCOME: ${{ steps.lint.outcome }}
+          SUMMARY_OUTCOME: ${{ steps.lint_summary.outcome }}
+          WARNINGS: ${{ steps.lint_summary.outputs.warning_count }}
+          ERRORS: ${{ steps.lint_summary.outputs.error_count }}
+          FATALS: ${{ steps.lint_summary.outputs.fatal_count }}
+        run: |
+          if [[ "$LINT_OUTCOME" != "success" ]]; then
+            echo "::error::Android Lint failed."
+            exit 1
+          fi
+
+          if [[ "$SUMMARY_OUTCOME" != "success" ]]; then
+            echo "::error::Lint report is missing or could not be parsed."
+            exit 1
+          fi
+
+          if (( WARNINGS > 0 || ERRORS > 0 || FATALS > 0 )); then
+            echo "::error::Lint found warnings or errors."
+            exit 1
+          fi
+
+  unit-tests:
+    name: JVM Unit Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - uses: android-actions/setup-android@v4
+
+      - run: chmod +x ./gradlew
+
+      - name: Run JVM Unit Tests
+        run: ./gradlew :app:testDebugUnitTest --no-daemon
