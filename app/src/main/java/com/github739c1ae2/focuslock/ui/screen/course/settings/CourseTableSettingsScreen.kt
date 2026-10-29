@@ -1,4 +1,4 @@
-package com.github739c1ae2.focuslock.ui.screen.course
+package com.github739c1ae2.focuslock.ui.screen.course.settings
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement

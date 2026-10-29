@@ -49,11 +49,11 @@ import com.github739c1ae2.focuslock.ui.navigation.scene.AdaptiveDialogSceneStrat
 import com.github739c1ae2.focuslock.ui.navigation.scene.rememberAdaptiveDialogSceneStrategy
 import com.github739c1ae2.focuslock.ui.navigation.scene.rememberBackInterceptionSceneDecoratorStrategy
 import com.github739c1ae2.focuslock.ui.screen.adapter.AdapterConfigScreen
-import com.github739c1ae2.focuslock.ui.screen.course.CourseEditorScreen
-import com.github739c1ae2.focuslock.ui.screen.course.CourseListScreen
-import com.github739c1ae2.focuslock.ui.screen.course.CourseTableImportScreen
-import com.github739c1ae2.focuslock.ui.screen.course.CourseTableSettingsScreen
-import com.github739c1ae2.focuslock.ui.screen.course.PeriodScheduleEditorScreen
+import com.github739c1ae2.focuslock.ui.screen.course.course.CourseEditorScreen
+import com.github739c1ae2.focuslock.ui.screen.course.list.CourseListScreen
+import com.github739c1ae2.focuslock.ui.screen.course.importer.CourseTableImportScreen
+import com.github739c1ae2.focuslock.ui.screen.course.settings.CourseTableSettingsScreen
+import com.github739c1ae2.focuslock.ui.screen.course.periods.PeriodScheduleEditorScreen
 import com.github739c1ae2.focuslock.ui.screen.home.HomeScreen
 import com.github739c1ae2.focuslock.ui.screen.profile.AdapterConfigResult
 import com.github739c1ae2.focuslock.ui.screen.profile.ProfileEditScreen

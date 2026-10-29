@@ -1,4 +1,4 @@
-package com.github739c1ae2.focuslock.ui.screen.course
+package com.github739c1ae2.focuslock.ui.screen.course.periods
 
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring

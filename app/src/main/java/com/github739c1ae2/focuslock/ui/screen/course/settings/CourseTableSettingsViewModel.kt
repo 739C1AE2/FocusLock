@@ -1,4 +1,4 @@
-package com.github739c1ae2.focuslock.ui.screen.course
+package com.github739c1ae2.focuslock.ui.screen.course.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -56,7 +56,9 @@ class CourseTableSettingsViewModel @Inject constructor(
     val state: StateFlow<TableSettingsState> = drafts.map { raw ->
         when (raw) {
             EditorState.Loading, EditorState.Failed -> TableSettingsState.Loading
-            is EditorState.Loaded -> TableSettingsState.Loaded(raw.draft, raw.isDirty, validateCourseTable(raw.draft))
+            is EditorState.Loaded -> TableSettingsState.Loaded(raw.draft, raw.isDirty,
+                validateCourseTable(raw.draft)
+            )
         }
     }.stateIn(viewModelScope, SharingStarted.Eagerly, TableSettingsState.Loading)
 

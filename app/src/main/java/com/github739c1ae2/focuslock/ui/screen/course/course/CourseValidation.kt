@@ -1,4 +1,4 @@
-package com.github739c1ae2.focuslock.ui.screen.course
+package com.github739c1ae2.focuslock.ui.screen.course.course
 
 import com.github739c1ae2.focuslock.R
 import com.github739c1ae2.focuslock.database.CourseTimeSlotEntity

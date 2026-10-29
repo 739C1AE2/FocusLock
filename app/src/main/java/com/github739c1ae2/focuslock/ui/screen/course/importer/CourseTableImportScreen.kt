@@ -1,4 +1,4 @@
-package com.github739c1ae2.focuslock.ui.screen.course
+package com.github739c1ae2.focuslock.ui.screen.course.importer
 
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
