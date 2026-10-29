@@ -49,7 +49,7 @@ import com.github739c1ae2.focuslock.database.ProfileEntity
 import com.github739c1ae2.focuslock.ui.components.InputDialog
 import com.github739c1ae2.focuslock.ui.components.ProfileDropdown
 import com.github739c1ae2.focuslock.ui.components.TimeOfDayPickerDialog
-import com.github739c1ae2.focuslock.util.ValidatedField
+import com.github739c1ae2.focuslock.util.ValidationResult
 import com.github739c1ae2.focuslock.util.applyImeInsetsAndConsumeScaffoldPadding
 import com.github739c1ae2.focuslock.util.calculateImeAwareScaffoldInsets
 import com.github739c1ae2.focuslock.util.minutesToClockString
@@ -123,7 +123,7 @@ fun ScheduleEditScreen(
                     ) {
                         Text(stringResource(R.string.reset))
                     }
-                    val valid = (state as? ScheduleState.Loaded)?.schedule?.isValid ?: false
+                    val valid = (state as? ScheduleState.Loaded)?.validation?.hasErrors == false
                     TextButton(
                         onClick = viewModel::save,
                         enabled = state.isDirty && valid
@@ -164,6 +164,7 @@ fun ScheduleEditScreen(
             is ScheduleState.Loaded -> {
                 ScheduleForm(
                     schedule = state.schedule,
+                    validation = state.validation,
                     profiles = viewModel.profiles.collectAsState().value,
                     onScheduleChange = viewModel::updateSchedule,
                     onCreateProfile = viewModel::createProfile,
@@ -175,7 +176,7 @@ fun ScheduleEditScreen(
 
 
     if (showDeleteConfirm) {
-        val name = (state as? ScheduleState.Loaded)?.schedule?.name?.value ?: scheduleId.toString()
+        val name = (state as? ScheduleState.Loaded)?.schedule?.name ?: scheduleId.toString()
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
             title = { Text(stringResource(R.string.delete)) },
@@ -203,6 +204,7 @@ fun ScheduleEditScreen(
 @Composable
 private fun ScheduleForm(
     schedule: ScheduleDraft,
+    validation: ValidationResult<ScheduleField>,
     profiles: List<ProfileEntity>,
     onScheduleChange: (ScheduleDraft) -> Unit,
     onCreateProfile: (String) -> Unit,
@@ -223,27 +225,27 @@ private fun ScheduleForm(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         OutlinedTextField(
-            value = schedule.name.value,
-            onValueChange = { onScheduleChange(schedule.copy(name = ValidatedField(it))) },
+            value = schedule.name,
+            onValueChange = { onScheduleChange(schedule.copy(name = it)) },
             label = { Text(stringResource(R.string.schedule_name)) },
             placeholder = { Text(stringResource(R.string.schedule_name_hint)) },
-            isError = !schedule.name.isValid,
+            isError = validation.hasError(ScheduleField.Name),
             supportingText = {
-                schedule.name.errorMessage?.asString()?.let { Text(it) }
+                validation.firstError(ScheduleField.Name)?.asString()?.let { Text(it) }
             },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true
         )
         Box(modifier = Modifier.fillMaxWidth()) {
             OutlinedTextField(
-                value = schedule.startMinute.value.minutesToClockString(),
+                value = schedule.startMinute.minutesToClockString(),
                 onValueChange = {},
                 label = { Text(stringResource(R.string.start_time)) },
                 readOnly = true,
                 modifier = Modifier.fillMaxWidth(),
-                isError = !schedule.startMinute.isValid,
+                isError = validation.hasError(ScheduleField.StartTime),
                 supportingText = {
-                    schedule.startMinute.errorMessage?.asString()?.let { Text(it) }
+                    validation.firstError(ScheduleField.StartTime)?.asString()?.let { Text(it) }
                 }
             )
             Box(
@@ -255,14 +257,14 @@ private fun ScheduleForm(
 
         Box(modifier = Modifier.fillMaxWidth()) {
             OutlinedTextField(
-                value = schedule.endMinute.value.minutesToClockString(),
+                value = schedule.endMinute.minutesToClockString(),
                 onValueChange = {},
                 label = { Text(stringResource(R.string.end_time)) },
                 readOnly = true,
                 modifier = Modifier.fillMaxWidth(),
-                isError = !schedule.endMinute.isValid,
+                isError = validation.hasError(ScheduleField.EndTime),
                 supportingText = {
-                    schedule.endMinute.errorMessage?.asString()?.let { Text(it) }
+                    validation.firstError(ScheduleField.EndTime)?.asString()?.let { Text(it) }
                 }
             )
             Box(
@@ -310,9 +312,9 @@ private fun ScheduleForm(
 
     if (showStartPicker) {
         TimeOfDayPickerDialog(
-            initialMinute = schedule.startMinute.value,
+            initialMinute = schedule.startMinute,
             onConfirm = {
-                onScheduleChange(schedule.copy(startMinute = ValidatedField(it)))
+                onScheduleChange(schedule.copy(startMinute = it))
                 showStartPicker = false
             },
             onDismiss = { showStartPicker = false }
@@ -320,9 +322,9 @@ private fun ScheduleForm(
     }
     if (showEndPicker) {
         TimeOfDayPickerDialog(
-            initialMinute = schedule.endMinute.value,
+            initialMinute = schedule.endMinute,
             onConfirm = {
-                onScheduleChange(schedule.copy(endMinute = ValidatedField(it)))
+                onScheduleChange(schedule.copy(endMinute = it))
                 showEndPicker = false
             },
             onDismiss = { showEndPicker = false }
@@ -358,10 +360,10 @@ private fun ScheduleForm(
 private fun FormPreview() {
     val sampleSchedule = ScheduleDraft(
         id = 1L,
-        name = ValidatedField("Sample Schedule"),
+        name = "Sample Schedule",
         daysOfWeek = setOf(DayOfWeek.MONDAY, DayOfWeek.WEDNESDAY),
-        startMinute = ValidatedField(480), // 8:00 AM
-        endMinute = ValidatedField(1020), // 5:00 PM
+        startMinute = 480, // 8:00 AM
+        endMinute = 1020, // 5:00 PM
         profileId = 1L
     )
     val sampleProfiles = listOf(
@@ -370,6 +372,7 @@ private fun FormPreview() {
     )
     ScheduleForm(
         schedule = sampleSchedule,
+        validation = validateSchedule(sampleSchedule),
         profiles = sampleProfiles,
         onScheduleChange = {},
         onCreateProfile = {}

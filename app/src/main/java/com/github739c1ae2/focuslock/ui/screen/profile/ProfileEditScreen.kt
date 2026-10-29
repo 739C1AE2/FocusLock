@@ -58,6 +58,7 @@ import androidx.navigation3.runtime.result.ResultEffect
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import com.github739c1ae2.focuslock.R
+import com.github739c1ae2.focuslock.util.ValidationResult
 import com.github739c1ae2.focuslock.adapter.AdapterFactoryRegistry
 import com.github739c1ae2.focuslock.database.AppRuleMode
 import com.github739c1ae2.focuslock.database.GLOBAL_PROFILE_ID
@@ -152,7 +153,7 @@ fun ProfileEditScreen(
                     ) {
                         Text(stringResource(R.string.reset))
                     }
-                    val valid = (state as? UiState.Loaded)?.profile?.isValid ?: false
+                    val valid = (state as? UiState.Loaded)?.validation?.hasErrors == false
                     TextButton(
                         onClick = viewModel::save,
                         enabled = state.isDirty && valid
@@ -193,6 +194,7 @@ fun ProfileEditScreen(
             is UiState.Loaded -> {
                 ProfileForm(
                     profile = state.profile,
+                    validation = state.validation,
                     schedules = schedules,
                     onNameChange = viewModel::updateName,
                     onSetUserAppMode = viewModel::setUserAppMode,
@@ -208,7 +210,7 @@ fun ProfileEditScreen(
 
 
     if (showDeleteConfirm) {
-        val name = (state as? UiState.Loaded)?.profile?.name?.value ?: profileId.toString()
+        val name = (state as? UiState.Loaded)?.profile?.name ?: profileId.toString()
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
             title = { Text(stringResource(R.string.delete)) },
@@ -233,6 +235,7 @@ fun ProfileEditScreen(
 @Composable
 private fun ProfileForm(
     profile: ProfileDraft,
+    validation: ValidationResult<ProfileField>,
     schedules: List<ScheduleEntity>,
     onNameChange: (String) -> Unit,
     onSetUserAppMode: (AppRuleMode) -> Unit,
@@ -256,12 +259,12 @@ private fun ProfileForm(
     ) {
         item {
             OutlinedTextField(
-                value = profile.name.value,
+                value = profile.name,
                 onValueChange = onNameChange,
                 label = { Text(stringResource(R.string.profile_name)) },
-                isError = !profile.name.isValid,
+                isError = validation.hasError(ProfileField.Name),
                 supportingText = {
-                    profile.name.errorMessage?.asString()?.let {
+                    validation.firstError(ProfileField.Name)?.asString()?.let {
                         Text(it)
                     }
                 },

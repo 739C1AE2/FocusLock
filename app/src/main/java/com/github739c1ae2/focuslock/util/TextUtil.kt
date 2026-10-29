@@ -17,7 +17,7 @@ sealed interface WeeksSummary {
     data class Weeks(val weeks: List<Int>) : WeeksSummary
 
     companion object {
-        fun from(weeks: Set<Int>, totalWeeks: Int): WeeksSummary {
+        fun from(weeks: Set<Int>): WeeksSummary {
             if (weeks.isEmpty()) return None
             val sorted = weeks.sorted()
             if (sorted.size == 1) return Single(sorted.first())

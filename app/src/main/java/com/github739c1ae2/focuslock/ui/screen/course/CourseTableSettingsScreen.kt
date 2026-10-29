@@ -54,7 +54,7 @@ import androidx.lifecycle.compose.dropUnlessResumed
 import com.github739c1ae2.focuslock.R
 import com.github739c1ae2.focuslock.database.CourseTimeTableEntity
 import com.github739c1ae2.focuslock.ui.components.SimpleDatePickerDialog
-import com.github739c1ae2.focuslock.util.ValidatedField
+import com.github739c1ae2.focuslock.util.ValidationResult
 import com.github739c1ae2.focuslock.util.applyImeInsetsAndConsumeScaffoldPadding
 import com.github739c1ae2.focuslock.util.calculateImeAwareScaffoldInsets
 import com.github739c1ae2.focuslock.util.epochDayToDateString
@@ -118,7 +118,7 @@ fun CourseTableSettingsScreen(
                     }
                     TextButton(
                         onClick = viewModel::save,
-                        enabled = state.isDirty && (loaded?.draft?.isValid == true)
+                        enabled = state.isDirty && (loaded?.validation?.hasErrors == false)
                     ) {
                         Text(
                             if (state.isDirty) stringResource(R.string.save) else stringResource(R.string.saved)
@@ -145,6 +145,7 @@ fun CourseTableSettingsScreen(
                 val defTimeTableName = stringResource(R.string.default_time_table_name)
                 TableSettingsForm(
                     draft = state.draft,
+                    validation = state.validation,
                     timeTables = timeTables,
                     innerPadding = innerPadding,
                     onUpdate = viewModel::updateDraft,
@@ -169,6 +170,7 @@ fun CourseTableSettingsScreen(
 @Composable
 private fun TableSettingsForm(
     draft: CourseTableDraft,
+    validation: ValidationResult<CourseTableField>,
     timeTables: List<CourseTimeTableEntity>,
     innerPadding: PaddingValues,
     onUpdate: ((CourseTableDraft) -> CourseTableDraft) -> Unit,
@@ -187,12 +189,12 @@ private fun TableSettingsForm(
     ) {
         item {
             OutlinedTextField(
-                value = draft.name.value,
-                onValueChange = { onUpdate { d -> d.copy(name = ValidatedField(it)) } },
+                value = draft.name,
+                onValueChange = { onUpdate { d -> d.copy(name = it) } },
                 label = { Text(stringResource(R.string.import_table_name)) },
-                isError = !draft.name.isValid,
+                isError = validation.hasError(CourseTableField.Name),
                 supportingText = {
-                    draft.name.errorMessage?.asString()?.let { Text(it) }
+                    validation.firstError(CourseTableField.Name)?.asString()?.let { Text(it) }
                 },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
@@ -208,15 +210,15 @@ private fun TableSettingsForm(
 
         item {
             OutlinedTextField(
-                value = if (draft.totalWeeks.value == 0) "" else draft.totalWeeks.value.toString(),
+                value = if (draft.totalWeeks == 0) "" else draft.totalWeeks.toString(),
                 onValueChange = { value ->
                     val weeks = value.filter { it.isDigit() }.toIntOrNull() ?: 0
-                    onUpdate { d -> d.copy(totalWeeks = ValidatedField(weeks)) }
+                    onUpdate { d -> d.copy(totalWeeks = weeks) }
                 },
                 label = { Text(stringResource(R.string.semester_total_weeks)) },
-                isError = !draft.totalWeeks.isValid,
+                isError = validation.hasError(CourseTableField.TotalWeeks),
                 supportingText = {
-                    draft.totalWeeks.errorMessage?.asString()?.let { Text(it) }
+                    validation.firstError(CourseTableField.TotalWeeks)?.asString()?.let { Text(it) }
                 },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),

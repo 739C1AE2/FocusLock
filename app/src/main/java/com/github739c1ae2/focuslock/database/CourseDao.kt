@@ -81,33 +81,43 @@ interface CourseDao {
         }
     }
 
-    @Query("""
-        SELECT s.*
-        FROM course_time_slots AS s
-        WHERE s.courseTableId = :courseTableId
-          AND s.timeTableId = (
-              SELECT t.id
-              FROM course_time_tables AS t
-              WHERE t.courseTableId = :courseTableId
-                AND (
-                    t.isBase = 1
-                    OR (
-                        t.isBase = 0
-                        AND :todayEpochDay BETWEEN t.startEpochDay
-                                               AND t.endEpochDay
+    companion object {
+        private const val EFFECTIVE_TIME_SLOTS_QUERY = """
+            SELECT s.*
+            FROM course_time_slots AS s
+            WHERE s.courseTableId = :courseTableId
+              AND s.timeTableId = (
+                  SELECT t.id
+                  FROM course_time_tables AS t
+                  WHERE t.courseTableId = :courseTableId
+                    AND (
+                        t.isBase = 1
+                        OR (
+                            t.isBase = 0
+                            AND :todayEpochDay BETWEEN t.startEpochDay
+                                                   AND t.endEpochDay
+                        )
                     )
-                )
-              ORDER BY
-                  CASE WHEN t.isBase = 0 THEN 0 ELSE 1 END,
-                  t.startEpochDay DESC
-              LIMIT 1
-          )
-        ORDER BY s.number ASC
-    """)
+                  ORDER BY
+                      CASE WHEN t.isBase = 0 THEN 0 ELSE 1 END,
+                      t.startEpochDay DESC
+                  LIMIT 1
+              )
+            ORDER BY s.number ASC
+        """
+    }
+
+    @Query(EFFECTIVE_TIME_SLOTS_QUERY)
     suspend fun getEffectiveTimeSlots(
         courseTableId: Long,
         todayEpochDay: Long
     ): List<CourseTimeSlotEntity>
+
+    @Query(EFFECTIVE_TIME_SLOTS_QUERY)
+    fun observeEffectiveTimeSlots(
+        courseTableId: Long,
+        todayEpochDay: Long
+    ): Flow<List<CourseTimeSlotEntity>>
 
     // ---------------- 课程 ----------------
 
@@ -161,7 +171,10 @@ interface CourseDao {
 
 data class CourseWithSessions(
     @Embedded val course: CourseEntity,
-    @Relation(parentColumns = ["id"], entityColumns = ["courseId"]) val sessions: List<CourseSessionEntity>
+    @Relation(
+        parentColumns = ["id"],
+        entityColumns = ["courseId"]
+    ) val sessions: List<CourseSessionEntity>
 )
 
 data class CourseListItem(

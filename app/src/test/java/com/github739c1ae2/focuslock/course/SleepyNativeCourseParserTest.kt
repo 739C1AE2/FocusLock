@@ -51,7 +51,7 @@ class SleepyNativeCourseParserTest {
     @Test
     fun magicSearchUsesNonBlankLineLimit() {
         val prefix = List(31) { "说明 $it\n\n" }.joinToString("")
-        assertTrue(parse(prefix + "#sleepy-v1").issues.isEmpty())
+        assertTrue(parse("$prefix#sleepy-v1").issues.isEmpty())
         assertEquals(
             CourseTableParseResult.Error(listOf(CourseImportIssue.InvalidSleepyFormat)),
             SleepyNativeCourseParser.onParseText(prefix + "额外说明\n#sleepy-v1")

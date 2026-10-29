@@ -59,7 +59,9 @@ import com.github739c1ae2.focuslock.ui.components.InputDialog
 import com.github739c1ae2.focuslock.ui.components.ProfileDropdown
 import com.github739c1ae2.focuslock.ui.components.TimeOfDayPickerDialog
 import com.github739c1ae2.focuslock.ui.components.WeeksDialog
-import com.github739c1ae2.focuslock.util.ValidatedField
+import com.github739c1ae2.focuslock.util.ValidationIssue
+import com.github739c1ae2.focuslock.util.ValidationSeverity
+import com.github739c1ae2.focuslock.util.ValidationResult
 import com.github739c1ae2.focuslock.util.WeeksSummary
 import com.github739c1ae2.focuslock.util.applyImeInsetsAndConsumeScaffoldPadding
 import com.github739c1ae2.focuslock.util.calculateImeAwareScaffoldInsets
@@ -82,8 +84,6 @@ fun CourseEditorScreen(
 ) {
     val state by viewModel.state.collectAsState()
     val profiles by viewModel.profiles.collectAsState()
-    val timeSlots by viewModel.timeSlots.collectAsState()
-    val totalWeeks by viewModel.totalWeeks.collectAsState()
 
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var showNewProfileDialog by remember { mutableStateOf(false) }
@@ -133,7 +133,7 @@ fun CourseEditorScreen(
                     TextButton(onClick = viewModel::load, enabled = state.isDirty) {
                         Text(stringResource(R.string.reset))
                     }
-                    val valid = (state as? CourseEditState.Loaded)?.draft?.isValid ?: false
+                    val valid = (state as? CourseEditState.Loaded)?.validation?.hasErrors == false
                     TextButton(onClick = viewModel::save, enabled = state.isDirty && valid) {
                         Text(
                             if (state.isDirty) stringResource(R.string.save) else stringResource(R.string.saved)
@@ -171,9 +171,10 @@ fun CourseEditorScreen(
             is CourseEditState.Loaded -> {
                 CourseForm(
                     draft = state.draft,
+                    validation = state.validation,
                     profiles = profiles,
-                    timeSlots = timeSlots,
-                    totalWeeks = totalWeeks,
+                    timeSlots = state.context.timeSlots,
+                    totalWeeks = state.context.totalWeeks,
                     innerPadding = innerPadding,
                     onUpdate = viewModel::updateDraft,
                     onAddSession = viewModel::addSession,
@@ -186,7 +187,7 @@ fun CourseEditorScreen(
     }
 
     if (showDeleteConfirm) {
-        val name = (state as? CourseEditState.Loaded)?.draft?.name?.value ?: courseId.toString()
+        val name = (state as? CourseEditState.Loaded)?.draft?.name ?: courseId.toString()
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
             title = { Text(stringResource(R.string.delete)) },
@@ -233,6 +234,7 @@ fun CourseEditorScreen(
 @Composable
 private fun CourseForm(
     draft: CourseDraft,
+    validation: ValidationResult<CourseField>,
     profiles: List<ProfileEntity>,
     timeSlots: List<CourseTimeSlotEntity>,
     totalWeeks: Int,
@@ -255,12 +257,12 @@ private fun CourseForm(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         OutlinedTextField(
-            value = draft.name.value,
-            onValueChange = { onUpdate { d -> d.copy(name = ValidatedField(it)) } },
+            value = draft.name,
+            onValueChange = { onUpdate { d -> d.copy(name = it) } },
             label = { Text(stringResource(R.string.course_name)) },
-            isError = !draft.name.isValid,
+            isError = validation.hasError(CourseField.Name),
             supportingText = {
-                draft.name.errorMessage?.asString()?.let { Text(it) }
+                validation.firstError(CourseField.Name)?.asString()?.let { Text(it) }
             },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true
@@ -294,6 +296,8 @@ private fun CourseForm(
                 SessionCard(
                     index = index,
                     session = session,
+                    issues = validation.issuesFor(CourseField.SessionTime(session.key)) +
+                        validation.issuesFor(CourseField.SessionWeeks(session.key)),
                     timeSlots = timeSlots,
                     totalWeeks = totalWeeks,
                     onUpdate = { transform -> onUpdateSession(session.key, transform) },
@@ -308,6 +312,7 @@ private fun CourseForm(
 private fun SessionCard(
     index: Int,
     session: SessionDraft,
+    issues: List<ValidationIssue<CourseField>>,
     timeSlots: List<CourseTimeSlotEntity>,
     totalWeeks: Int,
     onUpdate: ((SessionDraft) -> SessionDraft) -> Unit,
@@ -398,7 +403,7 @@ private fun SessionCard(
                                     current.copy(
                                         time = sections.copy(
                                             startSection = number,
-                                            endSection = sections.endSection ?: number
+                                            endSection = sections.endSection
                                         )
                                     )
                                 }
@@ -435,15 +440,16 @@ private fun SessionCard(
 
             WeeksField(
                 weeks = session.weeks,
-                totalWeeks = totalWeeks,
                 onClick = { showWeeksDialog = true }
             )
 
-            session.errorMessage?.asString()?.let { error ->
+            issues.forEach { issue ->
+                val isError = issue.severity == ValidationSeverity.Error
                 Text(
-                    text = error,
+                    text = issue.message.asString(),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error
+                    color = if (isError) MaterialTheme.colorScheme.error
+                        else MaterialTheme.colorScheme.tertiary
                 )
             }
         }
@@ -536,13 +542,13 @@ private fun CourseTimeSlotEntity.toDisplayString(): String {
 private fun SectionDropdown(
     label: String,
     slots: List<CourseTimeSlotEntity>,
-    selectedNumber: Int?,
+    selectedNumber: Int,
     onSelect: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var expanded by remember { mutableStateOf(false) }
     val selected = slots.firstOrNull { it.number == selectedNumber }
-    val display = selected?.toDisplayString() ?: stringResource(R.string.not_set)
+    val display = selected?.toDisplayString() ?: stringResource(R.string.unknown)
 
     ExposedDropdownMenuBox(
         expanded = expanded,
@@ -609,11 +615,10 @@ private fun TimeField(
 @Composable
 private fun WeeksField(
     weeks: Set<Int>,
-    totalWeeks: Int,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val summary = when (val weeksSummary = WeeksSummary.from(weeks, totalWeeks)) {
+    val summary = when (val weeksSummary = WeeksSummary.from(weeks)) {
         is WeeksSummary.None -> stringResource(R.string.weeks_summary_none)
         is WeeksSummary.Single -> stringResource(
             R.string.weeks_summary_single_fmt,

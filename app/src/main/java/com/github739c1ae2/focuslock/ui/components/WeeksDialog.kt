@@ -29,8 +29,8 @@ fun WeeksDialog(
     onConfirm: (Set<Int>) -> Unit,
     onDismiss: () -> Unit
 ) {
-    var selected by remember { mutableStateOf(initial) }
     val safeTotal = totalWeeks.coerceAtLeast(1)
+    var selected by remember { mutableStateOf(initial intersect (1..safeTotal)) }
     val allWeeks = (1..safeTotal).toSet()
     val oddWeeks = (1..safeTotal).filter { it % 2 == 1 }.toSet()
     val evenWeeks = (1..safeTotal).filter { it % 2 == 0 }.toSet()
@@ -67,7 +67,8 @@ fun WeeksDialog(
                         FilterChip(
                             selected = week in selected,
                             onClick = {
-                                selected = if (week in selected) selected - week else selected + week
+                                selected =
+                                    if (week in selected) selected - week else selected + week
                             },
                             label = { Text(week.toString()) }
                         )

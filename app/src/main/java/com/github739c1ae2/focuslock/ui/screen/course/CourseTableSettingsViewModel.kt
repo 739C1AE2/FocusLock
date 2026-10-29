@@ -2,57 +2,43 @@ package com.github739c1ae2.focuslock.ui.screen.course
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.github739c1ae2.focuslock.R
 import com.github739c1ae2.focuslock.database.COURSE_TABLE_ID
 import com.github739c1ae2.focuslock.database.CourseRepository
 import com.github739c1ae2.focuslock.database.CourseTableEntity
 import com.github739c1ae2.focuslock.database.CourseTimeTableEntity
-import com.github739c1ae2.focuslock.util.FormDraft
-import com.github739c1ae2.focuslock.util.UiText
-import com.github739c1ae2.focuslock.util.ValidatedField
+import com.github739c1ae2.focuslock.util.EditorState
+import com.github739c1ae2.focuslock.util.ValidationResult
+import com.github739c1ae2.focuslock.util.edit
+import com.github739c1ae2.focuslock.util.markSaved
+import com.github739c1ae2.focuslock.util.validatedSnapshot
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.DayOfWeek
 import java.time.LocalDate
 import javax.inject.Inject
 
 data class CourseTableDraft(
-    val name: ValidatedField<String>,
+    val name: String,
     val semesterStartEpochDay: Long?,
-    val totalWeeks: ValidatedField<Int>,
+    val totalWeeks: Int,
     val firstDayOfWeek: DayOfWeek
-) : FormDraft<CourseTableDraft> {
-    override val isValid: Boolean
-        get() = name.isValid && totalWeeks.isValid
-
-    override fun toValidated(): CourseTableDraft {
-        val nameError = if (name.value.isBlank()) {
-            UiText.StringResource(R.string.table_name_empty_error)
-        } else {
-            null
-        }
-        val weeksError = if (totalWeeks.value !in 1..60) {
-            UiText.StringResource(R.string.semester_total_weeks_invalid_fmt, 1, 60)
-        } else {
-            null
-        }
-        return copy(
-            name = name.copy(errorMessage = nameError),
-            totalWeeks = totalWeeks.copy(errorMessage = weeksError)
-        )
-    }
-}
+)
 
 sealed class TableSettingsState(open val isDirty: Boolean) {
     object Loading : TableSettingsState(false)
-    data class Loaded(val draft: CourseTableDraft, override val isDirty: Boolean) : TableSettingsState(isDirty)
+    data class Loaded(
+        val draft: CourseTableDraft,
+        override val isDirty: Boolean,
+        val validation: ValidationResult<CourseTableField>
+    ) : TableSettingsState(isDirty)
 }
 
 sealed interface TableSettingsEvent {
@@ -65,8 +51,14 @@ class CourseTableSettingsViewModel @Inject constructor(
     private val repository: CourseRepository
 ) : ViewModel() {
 
-    val state: StateFlow<TableSettingsState>
-        field = MutableStateFlow<TableSettingsState>(TableSettingsState.Loading)
+    private val drafts = MutableStateFlow<EditorState<CourseTableDraft>>(EditorState.Loading)
+
+    val state: StateFlow<TableSettingsState> = drafts.map { raw ->
+        when (raw) {
+            EditorState.Loading, EditorState.Failed -> TableSettingsState.Loading
+            is EditorState.Loaded -> TableSettingsState.Loaded(raw.draft, raw.isDirty, validateCourseTable(raw.draft))
+        }
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, TableSettingsState.Loading)
 
     val timeTables: StateFlow<List<CourseTimeTableEntity>> = repository.observeTimeTableEntities()
         .stateIn(
@@ -78,50 +70,45 @@ class CourseTableSettingsViewModel @Inject constructor(
     val eventFlow: SharedFlow<TableSettingsEvent>
         field = MutableSharedFlow<TableSettingsEvent>()
 
+    private var loadJob: Job? = null
+
     init {
         load()
     }
 
     fun load() {
-        viewModelScope.launch {
+        loadJob?.cancel()
+        drafts.value = EditorState.Loading
+        loadJob = viewModelScope.launch {
             val table = repository.getCourseTable()
             val draft = CourseTableDraft(
-                name = ValidatedField(table.name),
+                name = table.name,
                 semesterStartEpochDay = table.semesterStartEpochDay,
-                totalWeeks = ValidatedField(table.semesterTotalWeeks),
+                totalWeeks = table.semesterTotalWeeks,
                 firstDayOfWeek = table.firstDayOfWeek
-            ).toValidated()
-            state.value = TableSettingsState.Loaded(draft, isDirty = false)
+            )
+            drafts.value = EditorState.Loaded(draft, isDirty = false)
         }
     }
 
-    fun updateDraft(transform: (CourseTableDraft) -> CourseTableDraft) {
-        state.update { current ->
-            if (current is TableSettingsState.Loaded) {
-                current.copy(draft = transform(current.draft).toValidated(), isDirty = true)
-            } else {
-                current
-            }
-        }
-    }
+    fun updateDraft(transform: (CourseTableDraft) -> CourseTableDraft) = drafts.edit(transform)
 
     fun save() {
-        val loaded = state.value
-        if (loaded !is TableSettingsState.Loaded) return
-        if (!loaded.draft.isValid) return
+        val loaded = drafts.validatedSnapshot(::validateCourseTable) ?: return
         viewModelScope.launch {
             val draft = loaded.draft
             repository.updateCourseTable(
                 CourseTableEntity(
                     id = COURSE_TABLE_ID,
-                    name = draft.name.value.trim(),
+                    name = draft.name.trim(),
                     semesterStartEpochDay = draft.semesterStartEpochDay,
-                    semesterTotalWeeks = draft.totalWeeks.value,
+                    semesterTotalWeeks = draft.totalWeeks,
                     firstDayOfWeek = draft.firstDayOfWeek
                 )
             )
-            eventFlow.emit(TableSettingsEvent.Saved)
-            state.value = loaded.copy(isDirty = false)
+            if (drafts.markSaved(loaded)) {
+                eventFlow.emit(TableSettingsEvent.Saved)
+            }
         }
     }
 

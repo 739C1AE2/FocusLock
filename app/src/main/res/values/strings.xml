@@ -161,7 +161,6 @@
     <string name="add_session">添加时段</string>
     <string name="session_custom_time">自定义时间</string>
     <string name="session_time_range_error">开始时间不能晚于结束时间</string>
-    <string name="session_section_required_error">请选择起止节次</string>
     <string name="session_follow_timetable">跟随作息</string>
     <string name="session_start_section">开始节次</string>
     <string name="session_end_section">结束节次</string>
@@ -262,4 +261,9 @@
     <string name="course_import_format_sleepy_native_desc">仅支持 Sleepy 原生格式（.sleepy.txt），请在 Sleepy 中选择“Sleepy 原生格式”导出。\n仓库地址：https://github.com/lingion/sleepy</string>
     <string name="time_slot_time_range_error">开始时间不能晚于结束时间</string>
     <string name="time_slot_overlap_error">时间段不能重叠</string>
+    <string name="session_section_range_error">开始节次不能晚于结束节次</string>
+    <string name="session_unknown_sections_warning">引用了当前作息中不存在的节次：%1$s</string>
+    <string name="session_unknown_weeks_warning">引用了当前学期范围以外的周次：%1$s</string>
+    <string name="time_table_date_overlap_error">日期范围与其他临时作息重叠</string>
+    <string name="unknown">未知</string>
 </resources>

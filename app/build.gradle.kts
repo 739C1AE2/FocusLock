@@ -124,6 +124,7 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.reorderable)
     testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
     @Suppress("RedundantSuppression", "AvoidDuplicateDependencies")
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)

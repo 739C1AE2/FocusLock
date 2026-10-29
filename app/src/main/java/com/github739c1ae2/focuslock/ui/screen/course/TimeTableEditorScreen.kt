@@ -60,7 +60,7 @@ import androidx.lifecycle.compose.dropUnlessResumed
 import com.github739c1ae2.focuslock.R
 import com.github739c1ae2.focuslock.ui.components.SimpleDatePickerDialog
 import com.github739c1ae2.focuslock.ui.components.TimeOfDayPickerDialog
-import com.github739c1ae2.focuslock.util.ValidatedField
+import com.github739c1ae2.focuslock.util.ValidationResult
 import com.github739c1ae2.focuslock.util.applyImeInsetsAndConsumeScaffoldPadding
 import com.github739c1ae2.focuslock.util.calculateImeAwareScaffoldInsets
 import com.github739c1ae2.focuslock.util.minutesToClockString
@@ -136,7 +136,7 @@ fun TimeTableEditorScreen(
                     }
                     TextButton(
                         onClick = viewModel::save,
-                        enabled = state.isDirty && (loaded?.draft?.isValid == true)
+                        enabled = state.isDirty && (loaded?.validation?.hasErrors == false)
                     ) {
                         Text(
                             if (state.isDirty) stringResource(R.string.save) else stringResource(R.string.saved)
@@ -174,9 +174,10 @@ fun TimeTableEditorScreen(
             is TimeTableEditorState.Loaded -> {
                 TimeTableForm(
                     draft = state.draft,
+                    validation = state.validation,
                     innerPadding = innerPadding,
                     onNameChange = { name ->
-                        viewModel.updateDraft { it.copy(name = ValidatedField(name)) }
+                        viewModel.updateDraft { it.copy(name = name) }
                     },
                     onDateChange = { target, epochDay ->
                         when (target) {
@@ -196,7 +197,7 @@ fun TimeTableEditorScreen(
 
 
     if (showDeleteConfirm) {
-        val name = (state as? TimeTableEditorState.Loaded)?.draft?.name?.value ?: ""
+        val name = (state as? TimeTableEditorState.Loaded)?.draft?.name ?: ""
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
             title = { Text(stringResource(R.string.delete)) },
@@ -222,6 +223,7 @@ fun TimeTableEditorScreen(
 @Composable
 private fun TimeTableForm(
     draft: TimeTableDraft,
+    validation: ValidationResult<TimeTableField>,
     innerPadding: PaddingValues,
     onNameChange: (String) -> Unit,
     onDateChange: (DateTarget, Long) -> Unit,
@@ -242,12 +244,12 @@ private fun TimeTableForm(
     ) {
         item {
             OutlinedTextField(
-                value = draft.name.value,
+                value = draft.name,
                 onValueChange = onNameChange,
                 label = { Text(stringResource(R.string.time_table_name)) },
-                isError = !draft.name.isValid,
+                isError = validation.hasError(TimeTableField.Name),
                 supportingText = {
-                    draft.name.errorMessage?.asString()?.let { Text(it) }
+                    validation.firstError(TimeTableField.Name)?.asString()?.let { Text(it) }
                 },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
@@ -258,16 +260,16 @@ private fun TimeTableForm(
             item {
                 DateField(
                     label = stringResource(R.string.time_table_start_date),
-                    epochDay = draft.startEpochDay.value,
-                    errorMessage = draft.startEpochDay.errorMessage?.asString(),
+                    epochDay = draft.startEpochDay,
+                    errorMessage = validation.firstError(TimeTableField.StartDate)?.asString(),
                     onClick = { datePickerTarget = DateTarget.START }
                 )
             }
             item {
                 DateField(
                     label = stringResource(R.string.time_table_end_date),
-                    epochDay = draft.endEpochDay.value,
-                    errorMessage = draft.endEpochDay.errorMessage?.asString(),
+                    epochDay = draft.endEpochDay,
+                    errorMessage = validation.firstError(TimeTableField.EndDate)?.asString(),
                     onClick = { datePickerTarget = DateTarget.END }
                 )
             }
@@ -293,7 +295,7 @@ private fun TimeTableForm(
                 }
             }
         }
-        itemsIndexed(items = draft.slots, key = { _, item -> item.value.key }) { index, slot ->
+        itemsIndexed(items = draft.slots, key = { _, item -> item.key }) { index, slot ->
             Card(modifier =
                 Modifier.fillMaxWidth()
                     .animateItem(
@@ -305,8 +307,9 @@ private fun TimeTableForm(
                 TimeSlotEditorRow(
                     index = index,
                     slot = slot,
-                    onUpdate = { transform -> onUpdateSlot(slot.value.key, transform) },
-                    onRemove = { onRemoveSlot(slot.value.key) }
+                    errorMessage = validation.firstError(TimeTableField.Slot(slot.key))?.asString(),
+                    onUpdate = { transform -> onUpdateSlot(slot.key, transform) },
+                    onRemove = { onRemoveSlot(slot.key) }
                 )
             }
         }
@@ -316,8 +319,8 @@ private fun TimeTableForm(
     datePickerTarget?.let { target ->
         SimpleDatePickerDialog(
             initialEpochDay = when (target) {
-                DateTarget.START -> draft.startEpochDay.value
-                DateTarget.END -> draft.endEpochDay.value
+                DateTarget.START -> draft.startEpochDay
+                DateTarget.END -> draft.endEpochDay
             },
             onConfirm = { epochDay ->
                 onDateChange(target, epochDay)
@@ -406,7 +409,8 @@ fun PlainTextField(
 @Composable
 private fun TimeSlotEditorRow(
     index: Int,
-    slot: ValidatedField<TimeSlotDraft>,
+    slot: TimeSlotDraft,
+    errorMessage: String?,
     onUpdate: ((TimeSlotDraft) -> TimeSlotDraft) -> Unit,
     onRemove: () -> Unit,
     modifier: Modifier = Modifier
@@ -426,7 +430,7 @@ private fun TimeSlotEditorRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             PlainTextField(
-                value = slot.value.alias,
+                value = slot.alias,
                 onValueChange = { value -> onUpdate { it.copy(alias = value) } },
                 placeholder = {
                     Text(
@@ -442,15 +446,15 @@ private fun TimeSlotEditorRow(
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             TimePickerField(
                 label = stringResource(R.string.start_time),
-                minute = slot.value.startMinute,
-                errorMessage = slot.errorMessage?.asString(),
+                minute = slot.startMinute,
+                errorMessage = errorMessage,
                 onClick = { showStartPicker = true },
                 modifier = Modifier.weight(1f)
             )
             TimePickerField(
                 label = stringResource(R.string.end_time),
-                minute = slot.value.endMinute,
-                errorMessage = slot.errorMessage?.asString(),
+                minute = slot.endMinute,
+                errorMessage = errorMessage,
                 onClick = { showEndPicker = true },
                 modifier = Modifier.weight(1f)
             )
@@ -459,7 +463,7 @@ private fun TimeSlotEditorRow(
 
     if (showStartPicker) {
         TimeOfDayPickerDialog(
-            initialMinute = slot.value.startMinute,
+            initialMinute = slot.startMinute,
             onConfirm = { minute ->
                 onUpdate { it.copy(startMinute = minute) }
                 showStartPicker = false
@@ -469,7 +473,7 @@ private fun TimeSlotEditorRow(
     }
     if (showEndPicker) {
         TimeOfDayPickerDialog(
-            initialMinute = slot.value.endMinute,
+            initialMinute = slot.endMinute,
             onConfirm = { minute ->
                 onUpdate { it.copy(endMinute = minute) }
                 showEndPicker = false

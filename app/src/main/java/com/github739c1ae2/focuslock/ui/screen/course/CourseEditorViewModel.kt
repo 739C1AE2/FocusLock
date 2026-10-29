@@ -2,115 +2,91 @@ package com.github739c1ae2.focuslock.ui.screen.course
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.github739c1ae2.focuslock.R
 import com.github739c1ae2.focuslock.database.Course
 import com.github739c1ae2.focuslock.database.CourseRepository
 import com.github739c1ae2.focuslock.database.CourseSession
 import com.github739c1ae2.focuslock.database.CourseSessionTime
-import com.github739c1ae2.focuslock.database.CourseTimeSlotEntity
 import com.github739c1ae2.focuslock.database.LockRepository
 import com.github739c1ae2.focuslock.database.ProfileEntity
-import com.github739c1ae2.focuslock.util.FormDraft
-import com.github739c1ae2.focuslock.util.UiText
-import com.github739c1ae2.focuslock.util.ValidatedField
+import com.github739c1ae2.focuslock.util.EditorState
+import com.github739c1ae2.focuslock.util.ValidationResult
+import com.github739c1ae2.focuslock.util.edit
+import com.github739c1ae2.focuslock.util.markSaved
+import com.github739c1ae2.focuslock.util.validatedSnapshot
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.DayOfWeek
 import java.time.LocalDate
 
 sealed interface SessionTimeDraft {
-    data class Sections(val startSection: Int? = null, val endSection: Int? = null) : SessionTimeDraft
+    data class Sections(val startSection: Int = 1, val endSection: Int = 1) : SessionTimeDraft
     data class Custom(val startMinute: Int = 8 * 60, val endMinute: Int = 9 * 60) : SessionTimeDraft
 }
 
-// TODO: 添加引用未知节次的警告
-// TODO: 添加引用未知周次的警告
 data class SessionDraft(
     val key: Long,
     val teacher: String = "",
     val position: String = "",
     val dayOfWeek: DayOfWeek = DayOfWeek.MONDAY,
     val time: SessionTimeDraft = SessionTimeDraft.Sections(),
-    val weeks: Set<Int> = emptySet(),
-    val errorMessage: UiText? = null
-) : FormDraft<SessionDraft> {
-    override val isValid: Boolean
-        get() = errorMessage == null
-
-    override fun toValidated(): SessionDraft {
-        val error = when (val time = time) {
-            is SessionTimeDraft.Sections ->
-                if (time.startSection == null || time.endSection == null) {
-                    UiText.StringResource(R.string.session_section_required_error)
-                } else {
-                    null
-                }
-
-            is SessionTimeDraft.Custom ->
-                if (time.startMinute >= time.endMinute) {
-                    UiText.StringResource(R.string.session_time_range_error)
-                } else {
-                    null
-                }
-        }
-        return copy(errorMessage = error)
-    }
-}
+    val weeks: Set<Int> = emptySet()
+)
 
 data class CourseDraft(
     val id: Long,
-    val name: ValidatedField<String>,
+    val name: String,
     val profileId: Long,
     val sessions: List<SessionDraft>
-) : FormDraft<CourseDraft> {
-    override val isValid: Boolean
-        get() = name.isValid && sessions.all { it.isValid }
-
-    override fun toValidated(): CourseDraft {
-        val nameError = if (name.value.isBlank()) {
-            UiText.StringResource(R.string.course_name_empty_error)
-        } else {
-            null
-        }
-        return copy(
-            name = name.copy(errorMessage = nameError),
-            sessions = sessions.map { it.toValidated() }
-        )
-    }
-}
+)
 
 sealed class CourseEditState(open val isDirty: Boolean) {
-    object Loading : CourseEditState(false)
-    object Failed : CourseEditState(false)
-    data class Loaded(val draft: CourseDraft, override val isDirty: Boolean) : CourseEditState(isDirty)
+    data object Loading : CourseEditState(false)
+    data object Failed : CourseEditState(false)
+    data class Loaded(
+        val draft: CourseDraft,
+        override val isDirty: Boolean,
+        val validation: ValidationResult<CourseField>,
+        val context: CourseValidationContext
+    ) : CourseEditState(isDirty)
 }
 
 sealed interface CourseEditEvent {
-    object Saved : CourseEditEvent
-    object Deleted : CourseEditEvent
+    data object Saved : CourseEditEvent
+    data object Deleted : CourseEditEvent
     data class ProfileCreated(val profileId: Long) : CourseEditEvent
 }
 
+@OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel(assistedFactory = CourseEditorViewModel.Factory::class)
 class CourseEditorViewModel @AssistedInject constructor(
     private val courseRepository: CourseRepository,
     private val lockRepository: LockRepository,
     @Assisted private val courseId: Long
 ) : ViewModel() {
+    private val drafts = MutableStateFlow<EditorState<CourseDraft>>(EditorState.Loading)
+    private val referenceDate = MutableStateFlow(LocalDate.now().toEpochDay())
+    private val context: StateFlow<CourseValidationContext?> = referenceDate.flatMapLatest { day ->
+        combine(
+            courseRepository.observeEffectiveTimeSlots(day),
+            courseRepository.observeCourseTables()
+        ) { slots, table -> CourseValidationContext(slots, table.semesterTotalWeeks, day) }
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
-    val state: StateFlow<CourseEditState>
-        field = MutableStateFlow<CourseEditState>(CourseEditState.Loading)
+    val state: StateFlow<CourseEditState> = courseEditorStates(drafts, context, referenceDate)
+        .stateIn(viewModelScope, SharingStarted.Eagerly, CourseEditState.Loading)
 
     val eventFlow: SharedFlow<CourseEditEvent>
         field = MutableSharedFlow<CourseEditEvent>()
@@ -118,26 +94,19 @@ class CourseEditorViewModel @AssistedInject constructor(
     val profiles: StateFlow<List<ProfileEntity>> = lockRepository.observeAllProfileEntities()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val timeSlots: StateFlow<List<CourseTimeSlotEntity>>
-        field = MutableStateFlow(emptyList())
-
-    val totalWeeks: StateFlow<Int> = courseRepository.observeCourseTables()
-        .map { it.semesterTotalWeeks }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 20)
-
     private var nextKey = 1L
+    private var loadJob: Job? = null
 
-    init {
-        load()
-    }
+    init { load() }
 
     fun load() {
-        viewModelScope.launch {
-            val epochDay = LocalDate.now().toEpochDay()
-            timeSlots.value = courseRepository.getEffectiveTimeSlots(epochDay)
+        loadJob?.cancel()
+        drafts.value = EditorState.Loading
+        referenceDate.value = LocalDate.now().toEpochDay()
+        loadJob = viewModelScope.launch {
             val course = courseRepository.getCourse(courseId)
             if (course == null) {
-                state.value = CourseEditState.Failed
+                drafts.value = EditorState.Failed
                 return@launch
             }
             val sessions = course.sessions.map { session ->
@@ -149,51 +118,32 @@ class CourseEditorViewModel @AssistedInject constructor(
                     time = when (val time = session.time) {
                         is CourseSessionTime.Sections ->
                             SessionTimeDraft.Sections(time.startSection, time.endSection)
-
-                        is CourseSessionTime.Custom ->
-                            SessionTimeDraft.Custom(
-                                time.startMinute.coerceIn(0, 1438),
-                                time.endMinute.coerceIn(1, 1439)
-                            )
+                        is CourseSessionTime.Custom -> SessionTimeDraft.Custom(
+                            time.startMinute.coerceIn(0, 1438), time.endMinute.coerceIn(1, 1439)
+                        )
                     },
                     weeks = session.weeks
                 )
             }.ifEmpty { listOf(newSession()) }
-
-            val draft = CourseDraft(
-                id = course.id,
-                name = ValidatedField(course.name),
-                profileId = course.profileId,
-                sessions = sessions
-            ).toValidated()
-            state.value = CourseEditState.Loaded(draft, isDirty = false)
+            drafts.value = EditorState.Loaded(CourseDraft(course.id, course.name, course.profileId, sessions))
         }
     }
 
     private fun newSession(): SessionDraft = SessionDraft(key = nextKey++)
 
-    fun updateDraft(transform: (CourseDraft) -> CourseDraft) {
-        state.update { current ->
-            if (current is CourseEditState.Loaded) {
-                current.copy(draft = transform(current.draft).toValidated(), isDirty = true)
-            } else current
-        }
-    }
+    fun updateDraft(transform: (CourseDraft) -> CourseDraft) = drafts.edit(transform)
 
     fun addSession() {
-        updateDraft { it.copy(sessions = it.sessions + newSession()) }
+        val session = newSession()
+        updateDraft { it.copy(sessions = it.sessions + session) }
     }
 
-    fun removeSession(key: Long) {
-        updateDraft { draft ->
-            draft.copy(sessions = draft.sessions.filterNot { it.key == key })
-        }
+    fun removeSession(key: Long) = updateDraft { draft ->
+        draft.copy(sessions = draft.sessions.filterNot { it.key == key })
     }
 
-    fun updateSession(key: Long, transform: (SessionDraft) -> SessionDraft) {
-        updateDraft { draft ->
-            draft.copy(sessions = draft.sessions.map { if (it.key == key) transform(it) else it })
-        }
+    fun updateSession(key: Long, transform: (SessionDraft) -> SessionDraft) = updateDraft { draft ->
+        draft.copy(sessions = draft.sessions.map { if (it.key == key) transform(it) else it })
     }
 
     fun createProfile(name: String) {
@@ -206,49 +156,37 @@ class CourseEditorViewModel @AssistedInject constructor(
     }
 
     fun save() {
-        val current = state.value
-        if (current !is CourseEditState.Loaded) return
-        val draft = current.draft
-        if (!draft.isValid) return
+        val currentContext = context.value ?: return
+        if (currentContext.epochDay != referenceDate.value) return
+        val snapshot = drafts.validatedSnapshot { validateCourse(it, currentContext) } ?: return
+        val draft = snapshot.draft
         viewModelScope.launch {
             val course = Course(
                 id = draft.id,
-                name = draft.name.value.trim(),
+                name = draft.name.trim(),
                 profileId = draft.profileId,
                 sessions = draft.sessions.map { session ->
                     val time = when (val time = session.time) {
                         is SessionTimeDraft.Sections -> CourseSessionTime.Sections(
-                            startSection = requireNotNull(time.startSection),
-                            endSection = requireNotNull(time.endSection)
+                            time.startSection, time.endSection
                         )
-
-                        is SessionTimeDraft.Custom -> CourseSessionTime.Custom(
-                            startMinute = time.startMinute,
-                            endMinute = time.endMinute
-                        )
+                        is SessionTimeDraft.Custom -> CourseSessionTime.Custom(time.startMinute, time.endMinute)
                     }
-                    require(time.isValid()) { "Invalid session time" }
-                    CourseSession(
-                        teacher = session.teacher,
-                        position = session.position,
-                        dayOfWeek = session.dayOfWeek,
-                        time = time,
-                        weeks = session.weeks
-                    )
+                    CourseSession(session.teacher, session.position, session.dayOfWeek, time, session.weeks)
                 }
             )
             courseRepository.upsertCourse(course)
-            state.value = current.copy(isDirty = false)
-            eventFlow.emit(CourseEditEvent.Saved)
+            if (drafts.markSaved(snapshot)) {
+                eventFlow.emit(CourseEditEvent.Saved)
+            }
         }
     }
 
     fun delete() {
-        val current = state.value
-        if (current !is CourseEditState.Loaded) return
+        val snapshot = drafts.value as? EditorState.Loaded ?: return
         viewModelScope.launch {
-            courseRepository.deleteCourse(current.draft.id)
-            state.value = CourseEditState.Failed
+            courseRepository.deleteCourse(snapshot.draft.id)
+            drafts.value = EditorState.Failed
             eventFlow.emit(CourseEditEvent.Deleted)
         }
     }

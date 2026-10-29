@@ -98,6 +98,12 @@ class CourseRepository @Inject constructor(
     ): List<CourseTimeSlotEntity> =
         courseDao.getEffectiveTimeSlots(courseTableId, todayEpochDay)
 
+    fun observeEffectiveTimeSlots(
+        todayEpochDay: Long,
+        courseTableId: Long = COURSE_TABLE_ID
+    ): Flow<List<CourseTimeSlotEntity>> =
+        courseDao.observeEffectiveTimeSlots(courseTableId, todayEpochDay)
+
     suspend fun getCourse(courseId: Long): Course? =
         courseDao.getCourseWithSessions(courseId)?.toCourse()
 
