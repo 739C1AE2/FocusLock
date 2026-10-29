@@ -24,7 +24,7 @@ import javax.inject.Singleton
         ProfileAppRuleEntity::class,
         ScheduleEntity::class,
         CourseTableEntity::class,
-        CourseTimeTableEntity::class,
+        CoursePeriodScheduleEntity::class,
         CourseTimeSlotEntity::class,
         CourseEntity::class,
         CourseSessionEntity::class
@@ -62,7 +62,7 @@ val MIGRATION_2_3 = object : Migration(2, 3) {
             )
         """.trimIndent())
         connection.execSQL("""
-            CREATE TABLE IF NOT EXISTS `course_time_tables` (
+            CREATE TABLE IF NOT EXISTS `course_period_schedules` (
                 `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
                 `courseTableId` INTEGER NOT NULL,
                 `name` TEXT NOT NULL,
@@ -73,24 +73,24 @@ val MIGRATION_2_3 = object : Migration(2, 3) {
                     ON UPDATE NO ACTION ON DELETE CASCADE
             )
         """.trimIndent())
-        connection.execSQL("CREATE INDEX IF NOT EXISTS `index_course_time_tables_courseTableId` ON `course_time_tables` (`courseTableId`)")
+        connection.execSQL("CREATE INDEX IF NOT EXISTS `index_course_period_schedules_courseTableId` ON `course_period_schedules` (`courseTableId`)")
         connection.execSQL("""
             CREATE TABLE IF NOT EXISTS `course_time_slots` (
                 `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
                 `courseTableId` INTEGER NOT NULL,
-                `timeTableId` INTEGER NOT NULL,
+                `periodScheduleId` INTEGER NOT NULL,
                 `number` INTEGER NOT NULL,
                 `startMinute` INTEGER NOT NULL,
                 `endMinute` INTEGER NOT NULL,
                 `alias` TEXT NOT NULL,
                 FOREIGN KEY(`courseTableId`) REFERENCES `course_tables`(`id`)
                     ON UPDATE NO ACTION ON DELETE CASCADE,
-                FOREIGN KEY(`timeTableId`) REFERENCES `course_time_tables`(`id`)
+                FOREIGN KEY(`periodScheduleId`) REFERENCES `course_period_schedules`(`id`)
                     ON UPDATE NO ACTION ON DELETE CASCADE
             )
         """.trimIndent())
         connection.execSQL("CREATE INDEX IF NOT EXISTS `index_course_time_slots_courseTableId` ON `course_time_slots` (`courseTableId`)")
-        connection.execSQL("CREATE INDEX IF NOT EXISTS `index_course_time_slots_timeTableId` ON `course_time_slots` (`timeTableId`)")
+        connection.execSQL("CREATE INDEX IF NOT EXISTS `index_course_time_slots_periodScheduleId` ON `course_time_slots` (`periodScheduleId`)")
         connection.execSQL("""
             CREATE TABLE IF NOT EXISTS `courses` (
                 `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
@@ -157,7 +157,7 @@ object DatabaseModule {
         runBlocking {
             database.courseDao().initializeCourseTable(
                 courseTableName = context.getString(R.string.course_table_title),
-                baseTimeTableName = context.getString(R.string.base_time_table_name)
+                basePeriodScheduleName = context.getString(R.string.base_period_schedule_name)
             )
         }
         return database.courseDao()

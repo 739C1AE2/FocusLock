@@ -140,7 +140,7 @@ class CourseImportNormalizerTest {
         )
         val result = normalize(table(slots = listOf(baseSlots.first()) + invalid, courses = emptyList()))
 
-        assertEquals(listOf(baseSlots.first()), result.data.baseTimeTable.slots)
+        assertEquals(listOf(baseSlots.first()), result.data.basePeriodSchedule.slots)
         assertEquals(invalid.map { CourseImportIssue.InvalidSlotRemoved("基础", it) }, result.issues)
     }
 
@@ -152,7 +152,7 @@ class CourseImportNormalizerTest {
             first, first.copy(alias = " "), first.copy(alias = "早课"), first.copy(alias = "后续别名"), baseSlots.last()
         )))
 
-        assertEquals(listOf(first.copy(alias = "早课"), baseSlots.last()), result.data.baseTimeTable.slots)
+        assertEquals(listOf(first.copy(alias = "早课"), baseSlots.last()), result.data.basePeriodSchedule.slots)
         assertTrue(result.issues.isEmpty())
     }
 
@@ -163,7 +163,7 @@ class CourseImportNormalizerTest {
             baseSlots.first(), TimeSlot(2, 540, 585), TimeSlot(2, 600, 645), TimeSlot(3, 660, 705)
         ), courses = emptyList()))
 
-        assertEquals(listOf(baseSlots.first(), TimeSlot(2, 660, 705)), result.data.baseTimeTable.slots)
+        assertEquals(listOf(baseSlots.first(), TimeSlot(2, 660, 705)), result.data.basePeriodSchedule.slots)
         assertEquals(listOf(CourseImportIssue.ConflictingSlotsNumbersRemoved("基础", listOf(2))), result.issues)
     }
 
@@ -174,7 +174,7 @@ class CourseImportNormalizerTest {
             TimeSlot(1, 480, 540), TimeSlot(2, 525, 585), TimeSlot(3, 570, 630), TimeSlot(4, 660, 720)
         ), courses = emptyList()))
 
-        assertEquals(listOf(TimeSlot(1, 660, 720)), result.data.baseTimeTable.slots)
+        assertEquals(listOf(TimeSlot(1, 660, 720)), result.data.basePeriodSchedule.slots)
         assertEquals(listOf(CourseImportIssue.OverlappingSlotsRemoved("基础", listOf(1, 2, 3))), result.issues)
     }
 
@@ -184,7 +184,7 @@ class CourseImportNormalizerTest {
         val slots = listOf(TimeSlot(1, 480, 540), TimeSlot(2, 540, 600))
         val result = normalize(table(slots = slots))
 
-        assertEquals(slots, result.data.baseTimeTable.slots)
+        assertEquals(slots, result.data.basePeriodSchedule.slots)
         assertTrue(result.issues.isEmpty())
     }
 
@@ -195,7 +195,7 @@ class CourseImportNormalizerTest {
             TimeSlot(1, 600, 645), TimeSlot(2, 480, 525), TimeSlot(3, 720, 765)
         ), courses = emptyList()))
 
-        assertEquals(listOf(TimeSlot(1, 720, 765)), result.data.baseTimeTable.slots)
+        assertEquals(listOf(TimeSlot(1, 720, 765)), result.data.basePeriodSchedule.slots)
         assertEquals(listOf(CourseImportIssue.NonChronologicalSlotsRemoved("基础", listOf(1, 2))), result.issues)
     }
 
@@ -208,9 +208,9 @@ class CourseImportNormalizerTest {
             courses = listOf(course(sessions = listOf(session(time = CourseSessionTime.Sections(1, 3)))))
         ))
 
-        assertTrue(result.data.baseTimeTable.slots.isEmpty())
+        assertTrue(result.data.basePeriodSchedule.slots.isEmpty())
         assertEquals(complete, result.data.seasonalTables.single().slots)
-        assertEquals(listOf(CourseImportIssue.TimeTableClearedForSectionGap("基础", 2)), result.issues)
+        assertEquals(listOf(CourseImportIssue.PeriodScheduleClearedForSectionGap("基础", 2)), result.issues)
     }
 
     /** 季节作息缺少内部行时先清空，再移除空表，并分别记录两种诊断。 */
@@ -219,11 +219,11 @@ class CourseImportNormalizerTest {
         val complete = baseSlots + TimeSlot(3, 600, 645)
         val result = normalize(table(slots = complete, seasons = listOf(season(slots = listOf(complete[0], complete[2])))))
 
-        assertEquals(complete, result.data.baseTimeTable.slots)
+        assertEquals(complete, result.data.basePeriodSchedule.slots)
         assertTrue(result.data.seasonalTables.isEmpty())
         assertEquals(listOf(
-            CourseImportIssue.TimeTableClearedForSectionGap("冬季", 2),
-            CourseImportIssue.EmptySeasonalTimeTableRemoved("冬季")
+            CourseImportIssue.PeriodScheduleClearedForSectionGap("冬季", 2),
+            CourseImportIssue.EmptySeasonalPeriodScheduleRemoved("冬季")
         ), result.issues)
     }
 
@@ -236,8 +236,8 @@ class CourseImportNormalizerTest {
             complete.drop(1) to 1
         )) {
             val result = normalize(table(slots = slots, seasons = listOf(season(slots = complete)), courses = emptyList()))
-            assertTrue(result.data.baseTimeTable.slots.isEmpty())
-            assertEquals(listOf(CourseImportIssue.TimeTableClearedForSectionGap("基础", expectedGap)), result.issues)
+            assertTrue(result.data.basePeriodSchedule.slots.isEmpty())
+            assertEquals(listOf(CourseImportIssue.PeriodScheduleClearedForSectionGap("基础", expectedGap)), result.issues)
         }
     }
 
@@ -249,7 +249,7 @@ class CourseImportNormalizerTest {
             course(sessions = listOf(session(time = CourseSessionTime.Sections(2, 4))))
         )))
 
-        assertEquals(baseSlots, result.data.baseTimeTable.slots)
+        assertEquals(baseSlots, result.data.basePeriodSchedule.slots)
         assertEquals(longer, result.data.seasonalTables.single().slots)
         assertEquals(listOf(CourseImportIssue.UnknownSectionReferences(listOf(4))), result.issues)
     }
@@ -265,7 +265,7 @@ class CourseImportNormalizerTest {
         val result = normalize(input)
         val expectedSlots = slots.mapIndexed { index, slot -> slot.copy(number = index + 1) }
 
-        assertEquals(expectedSlots, result.data.baseTimeTable.slots)
+        assertEquals(expectedSlots, result.data.basePeriodSchedule.slots)
         assertEquals(expectedSlots, result.data.seasonalTables.single().slots)
         assertEquals(listOf(session(time = CourseSessionTime.Sections(1, 3)), custom), result.data.courses.single().sessions)
         assertTrue(result.issues.isEmpty())
@@ -284,7 +284,7 @@ class CourseImportNormalizerTest {
 
     /** 没有有效作息时只整体平移非正节次，保留课程跨度与引用间隔。 */
     @Test
-    fun noTimeTablesShiftsSectionReferencesWithoutCompressingGaps() {
+    fun noPeriodSchedulesShiftsSectionReferencesWithoutCompressingGaps() {
         val custom = session(time = CourseSessionTime.Custom(720, 780))
         val result = normalize(table(slots = emptyList(), courses = listOf(course(sessions = listOf(
             session(time = CourseSessionTime.Sections(-2, 0)),
@@ -295,29 +295,29 @@ class CourseImportNormalizerTest {
             session(time = CourseSessionTime.Sections(1, 3)),
             session(time = CourseSessionTime.Sections(7, 8)), custom
         ), result.data.courses.single().sessions)
-        assertTrue(result.data.baseTimeTable.slots.isEmpty())
-        assertEquals(listOf(CourseImportIssue.NoValidTimeTable), result.issues)
+        assertTrue(result.data.basePeriodSchedule.slots.isEmpty())
+        assertEquals(listOf(CourseImportIssue.NoValidPeriodSchedule), result.issues)
     }
 
     /** 无作息时，已为正数的引用无需压缩；纯自定义课程也可以保留。 */
     @Test
-    fun noTimeTablesKeepsPositiveReferencesAndCustomTimes() {
+    fun noPeriodSchedulesKeepsPositiveReferencesAndCustomTimes() {
         for (time in listOf(CourseSessionTime.Sections(5, 7), CourseSessionTime.Custom(480, 540))) {
             val input = table(slots = emptyList(), courses = listOf(course(sessions = listOf(session(time = time)))))
             val result = normalize(input)
             assertEquals(input, result.data)
-            assertEquals(listOf(CourseImportIssue.NoValidTimeTable), result.issues)
+            assertEquals(listOf(CourseImportIssue.NoValidPeriodSchedule), result.issues)
         }
     }
 
     /** 空季节作息移除后，若所有表都无效，仍须报告没有有效作息。 */
     @Test
-    fun removesEmptySeasonsBeforeDetectingNoValidTimeTable() {
+    fun removesEmptySeasonsBeforeDetectingNoValidPeriodSchedule() {
         val result = normalize(table(slots = emptyList(), seasons = listOf(season(slots = emptyList()))))
 
         assertTrue(result.data.seasonalTables.isEmpty())
         assertEquals(listOf(
-            CourseImportIssue.EmptySeasonalTimeTableRemoved("冬季"), CourseImportIssue.NoValidTimeTable
+            CourseImportIssue.EmptySeasonalPeriodScheduleRemoved("冬季"), CourseImportIssue.NoValidPeriodSchedule
         ), result.issues)
     }
 
@@ -379,15 +379,15 @@ class CourseImportNormalizerTest {
     /** 默认样例包含合法基础作息、两节连堂课和明确的开学日期。 */
     private fun table(
         slots: List<TimeSlot> = baseSlots,
-        seasons: List<TimeTableImport> = emptyList(),
+        seasons: List<PeriodScheduleImport> = emptyList(),
         courses: List<CourseImport> = listOf(course())
     ) = CourseTableImport(
         semesterStart, 20, DayOfWeek.MONDAY,
-        TimeTableImport("基础", slots = slots), seasons, courses
+        PeriodScheduleImport("基础", slots = slots), seasons, courses
     )
 
     private fun season(slots: List<TimeSlot> = baseSlots) =
-        TimeTableImport("冬季", semesterStart + 30, semesterStart + 60, slots)
+        PeriodScheduleImport("冬季", semesterStart + 30, semesterStart + 60, slots)
 
     private fun course(name: String = "数学", sessions: List<SessionImport> = listOf(session())) = CourseImport(name, sessions)
 

@@ -41,7 +41,7 @@ class AppDatabaseMigrationTest {
         courseDao.initializeCourseTable("课程表", "基础作息")
         val table = requireNotNull(courseDao.getCourseTable(COURSE_TABLE_ID))
         assertEquals(CourseTableEntity(name = "课程表"), table)
-        val base = requireNotNull(courseDao.getBaseTimeTable(table.id))
+        val base = requireNotNull(courseDao.getBasePeriodSchedule(table.id))
         assertTrue(base.isBase)
         assertEquals(LocalDate.MIN.toEpochDay(), base.startEpochDay)
         assertEquals(LocalDate.MAX.toEpochDay(), base.endEpochDay)
@@ -49,12 +49,12 @@ class AppDatabaseMigrationTest {
         // 初始化可重复执行，不覆盖已有设置或额外创建基础作息。
         courseDao.initializeCourseTable("新名称", "新作息")
         assertEquals(table, courseDao.getCourseTable(table.id))
-        assertEquals(base, courseDao.getBaseTimeTable(table.id))
+        assertEquals(base, courseDao.getBasePeriodSchedule(table.id))
         val slot = CourseTimeSlotEntity(
-            timeTableId = base.id, number = 1, startMinute = 480, endMinute = 525
+            periodScheduleId = base.id, number = 1, startMinute = 480, endMinute = 525
         )
         courseDao.insertTimeSlots(listOf(slot))
-        assertEquals(slot.copy(id = 1), courseDao.getSlotsByTimeTable(base.id).single())
+        assertEquals(slot.copy(id = 1), courseDao.getSlotsByPeriodSchedule(base.id).single())
 
         val courseId = courseDao.insertCourse(CourseEntity(name = "数学", profileId = 2))
         val sectionSession = CourseSessionEntity(
@@ -80,8 +80,8 @@ class AppDatabaseMigrationTest {
         assertEquals(GLOBAL_PROFILE_ID, reassigned.course.profileId)
         assertEquals(course.sessions.sortedBy { it.id }, reassigned.sessions.sortedBy { it.id })
 
-        courseDao.deleteTimeTable(base.id)
-        assertTrue(courseDao.getSlotsByTimeTable(base.id).isEmpty())
+        courseDao.deletePeriodSchedule(base.id)
+        assertTrue(courseDao.getSlotsByPeriodSchedule(base.id).isEmpty())
         courseDao.deleteCourseById(courseId)
         assertNull(courseDao.getCourseWithSessions(courseId))
     }
@@ -92,7 +92,7 @@ class AppDatabaseMigrationTest {
         val migrated = openCurrentDatabase()
         assertLegacyData(migrated, expectedSortOrder = 480)
         migrated.courseDao().initializeCourseTable("课程表", "基础作息")
-        assertNotNull(migrated.courseDao().getBaseTimeTable(COURSE_TABLE_ID))
+        assertNotNull(migrated.courseDao().getBasePeriodSchedule(COURSE_TABLE_ID))
     }
 
     private fun openCurrentDatabase(): AppDatabase = Room.databaseBuilder(

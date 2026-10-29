@@ -52,7 +52,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.dropUnlessResumed
 import com.github739c1ae2.focuslock.R
-import com.github739c1ae2.focuslock.database.CourseTimeTableEntity
+import com.github739c1ae2.focuslock.database.CoursePeriodScheduleEntity
 import com.github739c1ae2.focuslock.ui.components.SimpleDatePickerDialog
 import com.github739c1ae2.focuslock.util.ValidationResult
 import com.github739c1ae2.focuslock.util.applyImeInsetsAndConsumeScaffoldPadding
@@ -67,12 +67,12 @@ fun CourseTableSettingsScreen(
     isSinglePane: Boolean,
     onBack: () -> Unit,
     onDirtyChange: (Boolean) -> Unit,
-    onOpenTimeTable: (Long) -> Unit,
+    onOpenPeriodSchedule: (Long) -> Unit,
     onSaved: () -> Unit,
     viewModel: CourseTableSettingsViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsState()
-    val timeTables by viewModel.timeTables.collectAsState()
+    val periodSchedules by viewModel.periodSchedules.collectAsState()
     var showDatePicker by remember { mutableStateOf(false) }
 
     LaunchedEffect(state.isDirty) {
@@ -83,7 +83,7 @@ fun CourseTableSettingsScreen(
         viewModel.eventFlow.collect { event ->
             when (event) {
                 is TableSettingsEvent.Saved -> onSaved()
-                is TableSettingsEvent.OpenTimeTable -> onOpenTimeTable(event.timeTableId)
+                is TableSettingsEvent.OpenPeriodSchedule -> onOpenPeriodSchedule(event.periodScheduleId)
             }
         }
     }
@@ -142,16 +142,16 @@ fun CourseTableSettingsScreen(
             }
 
             is TableSettingsState.Loaded -> {
-                val defTimeTableName = stringResource(R.string.default_time_table_name)
+                val defPeriodScheduleName = stringResource(R.string.default_period_schedule_name)
                 TableSettingsForm(
                     draft = state.draft,
                     validation = state.validation,
-                    timeTables = timeTables,
+                    periodSchedules = periodSchedules,
                     innerPadding = innerPadding,
                     onUpdate = viewModel::updateDraft,
                     onPickSemesterStart = { showDatePicker = true },
-                    onAddTimeTable = { viewModel.addTimeTable(defTimeTableName) },
-                    onOpenTimeTable = onOpenTimeTable
+                    onAddPeriodSchedule = { viewModel.addPeriodSchedule(defPeriodScheduleName) },
+                    onOpenPeriodSchedule = onOpenPeriodSchedule
                 )
             }
         }
@@ -171,12 +171,12 @@ fun CourseTableSettingsScreen(
 private fun TableSettingsForm(
     draft: CourseTableDraft,
     validation: ValidationResult<CourseTableField>,
-    timeTables: List<CourseTimeTableEntity>,
+    periodSchedules: List<CoursePeriodScheduleEntity>,
     innerPadding: PaddingValues,
     onUpdate: ((CourseTableDraft) -> CourseTableDraft) -> Unit,
     onPickSemesterStart: () -> Unit,
-    onAddTimeTable: () -> Unit,
-    onOpenTimeTable: (Long) -> Unit,
+    onAddPeriodSchedule: () -> Unit,
+    onOpenPeriodSchedule: (Long) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val insets = calculateImeAwareScaffoldInsets(innerPadding)
@@ -243,22 +243,22 @@ private fun TableSettingsForm(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = stringResource(R.string.time_tables),
+                    text = stringResource(R.string.period_schedules),
                     style = MaterialTheme.typography.titleSmall,
                     modifier = Modifier.weight(1f)
                 )
-                OutlinedButton(onClick = onAddTimeTable) {
+                OutlinedButton(onClick = onAddPeriodSchedule) {
                     Icon(Icons.Default.Add, contentDescription = null)
-                    Text(stringResource(R.string.add_time_table))
+                    Text(stringResource(R.string.add_period_schedule))
                 }
             }
 
         }
 
-        items(timeTables) { timeTable ->
-            TimeTableCard(
-                timeTable = timeTable,
-                onClick = { onOpenTimeTable(timeTable.id) }
+        items(periodSchedules) { periodSchedule ->
+            PeriodScheduleCard(
+                periodSchedule = periodSchedule,
+                onClick = { onOpenPeriodSchedule(periodSchedule.id) }
             )
         }
     }
@@ -291,8 +291,8 @@ private fun SemesterStartField(
 }
 
 @Composable
-private fun TimeTableCard(
-    timeTable: CourseTimeTableEntity,
+private fun PeriodScheduleCard(
+    periodSchedule: CoursePeriodScheduleEntity,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -308,17 +308,17 @@ private fun TimeTableCard(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = timeTable.name,
+                    text = periodSchedule.name,
                     style = MaterialTheme.typography.titleMedium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    text = if (timeTable.isBase) {
+                    text = if (periodSchedule.isBase) {
                         stringResource(R.string.permanent)
                     } else {
-                        val start = timeTable.startEpochDay.epochDayToDateString()
-                        val end = timeTable.endEpochDay.epochDayToDateString()
+                        val start = periodSchedule.startEpochDay.epochDayToDateString()
+                        val end = periodSchedule.endEpochDay.epochDayToDateString()
                         "$start ~ $end"
                     },
                     style = MaterialTheme.typography.bodySmall,

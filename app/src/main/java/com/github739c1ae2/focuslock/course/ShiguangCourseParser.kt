@@ -61,7 +61,7 @@ object ShiguangCourseParser :
             (config?.firstDayOfWeek ?: DayOfWeek.MONDAY.value).coerceIn(1, 7)
         )
 
-        val baseSlots = table.timeSlots.orEmpty().toImport(DEFAULT_BASE_TIME_TABLE_NAME, issues)
+        val baseSlots = table.timeSlots.orEmpty().toImport(DEFAULT_BASE_PERIOD_SCHEDULE_NAME, issues)
 
         val seasonalTables = table.comboSchedule?.publicSchedules.orEmpty().map { season ->
             var start = parseDateToEpochDay(season.startDate)
@@ -69,7 +69,7 @@ object ShiguangCourseParser :
             if (start == null) {
                 start = semesterStartDate?.let{it - 1} ?: end ?: (LocalDate.now().toEpochDay() - 1)
                 issues += CourseImportIssue.InvalidSeasonStartDateFallback(
-                    timeTableName = season.name,
+                    periodScheduleName = season.name,
                     startDate = season.startDate,
                     defaultEpochDay = start
                 )
@@ -77,12 +77,12 @@ object ShiguangCourseParser :
             if (end == null) {
                 end = start
                 issues += CourseImportIssue.InvalidSeasonEndDateFallback(
-                    timeTableName = season.name,
+                    periodScheduleName = season.name,
                     endDate = season.endDate,
                     defaultEpochDay = end
                 )
             }
-            TimeTableImport(
+            PeriodScheduleImport(
                 name = season.name,
                 startEpochDay = start,
                 endEpochDay = end,
@@ -120,8 +120,8 @@ object ShiguangCourseParser :
             semesterStartEpochDay = semesterStartDate,
             totalWeeks = totalWeeks,
             firstDayOfWeek = firstDayOfWeek,
-            baseTimeTable = TimeTableImport(
-                name = DEFAULT_BASE_TIME_TABLE_NAME,
+            basePeriodSchedule = PeriodScheduleImport(
+                name = DEFAULT_BASE_PERIOD_SCHEDULE_NAME,
                 slots = baseSlots
             ),
             seasonalTables = seasonalTables,
@@ -134,14 +134,14 @@ object ShiguangCourseParser :
     }
 
     private fun List<TimeSlotJsonModel>.toImport(
-        timeTableName: String,
+        periodScheduleName: String,
         issues: MutableList<CourseImportIssue.Parsing>
     ): List<TimeSlot> {
         val slots = mapNotNull {
             val slot = it.toImport()
             if (slot == null) {
                 issues += CourseImportIssue.InvalidSlotSkipped(
-                    timeTableName = timeTableName,
+                    periodScheduleName = periodScheduleName,
                     slot = json.encodeToString(it).take(120)
                 )
             }

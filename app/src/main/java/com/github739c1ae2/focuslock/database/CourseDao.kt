@@ -26,13 +26,13 @@ interface CourseDao {
     suspend fun insertCourseTable(courseTable: CourseTableEntity)
 
     @Transaction
-    suspend fun initializeCourseTable(courseTableName: String, baseTimeTableName: String) {
+    suspend fun initializeCourseTable(courseTableName: String, basePeriodScheduleName: String) {
         if (getCourseTable(COURSE_TABLE_ID) == null) {
             insertCourseTable(CourseTableEntity(id = COURSE_TABLE_ID, name = courseTableName))
-            upsertTimeTable(
-                CourseTimeTableEntity(
+            upsertPeriodSchedule(
+                CoursePeriodScheduleEntity(
                     courseTableId = COURSE_TABLE_ID,
-                    name = baseTimeTableName,
+                    name = basePeriodScheduleName,
                     isBase = true,
                     startEpochDay = LocalDate.MIN.toEpochDay(),
                     endEpochDay = LocalDate.MAX.toEpochDay()
@@ -46,38 +46,38 @@ interface CourseDao {
 
     // ---------------- 作息表 ----------------
 
-    @Query("SELECT * FROM course_time_tables WHERE courseTableId = :courseTableId ORDER BY isBase DESC, id ASC")
-    fun observeTimeTables(courseTableId: Long): Flow<List<CourseTimeTableEntity>>
+    @Query("SELECT * FROM course_period_schedules WHERE courseTableId = :courseTableId ORDER BY isBase DESC, id ASC")
+    fun observePeriodSchedules(courseTableId: Long): Flow<List<CoursePeriodScheduleEntity>>
 
-    @Query("SELECT * FROM course_time_tables WHERE id = :id LIMIT 1")
-    suspend fun getTimeTable(id: Long): CourseTimeTableEntity?
+    @Query("SELECT * FROM course_period_schedules WHERE id = :id LIMIT 1")
+    suspend fun getPeriodSchedule(id: Long): CoursePeriodScheduleEntity?
 
-    @Query("SELECT * FROM course_time_tables WHERE courseTableId = :courseTableId AND isBase = 1 LIMIT 1")
-    suspend fun getBaseTimeTable(courseTableId: Long): CourseTimeTableEntity?
+    @Query("SELECT * FROM course_period_schedules WHERE courseTableId = :courseTableId AND isBase = 1 LIMIT 1")
+    suspend fun getBasePeriodSchedule(courseTableId: Long): CoursePeriodScheduleEntity?
 
     @Upsert
-    suspend fun upsertTimeTable(timeTable: CourseTimeTableEntity): Long
+    suspend fun upsertPeriodSchedule(periodSchedule: CoursePeriodScheduleEntity): Long
 
-    @Query("DELETE FROM course_time_tables WHERE id = :id")
-    suspend fun deleteTimeTable(id: Long)
+    @Query("DELETE FROM course_period_schedules WHERE id = :id")
+    suspend fun deletePeriodSchedule(id: Long)
 
-    @Query("DELETE FROM course_time_tables WHERE courseTableId = :courseTableId AND isBase = 0")
-    suspend fun deleteNonBaseTimeTables(courseTableId: Long)
+    @Query("DELETE FROM course_period_schedules WHERE courseTableId = :courseTableId AND isBase = 0")
+    suspend fun deleteNonBasePeriodSchedules(courseTableId: Long)
 
-    @Query("SELECT * FROM course_time_slots WHERE timeTableId = :timeTableId ORDER BY number ASC")
-    suspend fun getSlotsByTimeTable(timeTableId: Long): List<CourseTimeSlotEntity>
+    @Query("SELECT * FROM course_time_slots WHERE periodScheduleId = :periodScheduleId ORDER BY number ASC")
+    suspend fun getSlotsByPeriodSchedule(periodScheduleId: Long): List<CourseTimeSlotEntity>
 
-    @Query("DELETE FROM course_time_slots WHERE timeTableId = :timeTableId")
-    suspend fun deleteSlotsByTimeTable(timeTableId: Long)
+    @Query("DELETE FROM course_time_slots WHERE periodScheduleId = :periodScheduleId")
+    suspend fun deleteSlotsByPeriodSchedule(periodScheduleId: Long)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertTimeSlots(slots: List<CourseTimeSlotEntity>)
 
     @Transaction
-    suspend fun replaceTimeSlots(timeTableId: Long, slots: List<CourseTimeSlotEntity>) {
-        deleteSlotsByTimeTable(timeTableId)
+    suspend fun replaceTimeSlots(periodScheduleId: Long, slots: List<CourseTimeSlotEntity>) {
+        deleteSlotsByPeriodSchedule(periodScheduleId)
         if (slots.isNotEmpty()) {
-            insertTimeSlots(slots.map { it.copy(id = 0, timeTableId = timeTableId) })
+            insertTimeSlots(slots.map { it.copy(id = 0, periodScheduleId = periodScheduleId) })
         }
     }
 
@@ -86,9 +86,9 @@ interface CourseDao {
             SELECT s.*
             FROM course_time_slots AS s
             WHERE s.courseTableId = :courseTableId
-              AND s.timeTableId = (
+              AND s.periodScheduleId = (
                   SELECT t.id
-                  FROM course_time_tables AS t
+                  FROM course_period_schedules AS t
                   WHERE t.courseTableId = :courseTableId
                     AND (
                         t.isBase = 1

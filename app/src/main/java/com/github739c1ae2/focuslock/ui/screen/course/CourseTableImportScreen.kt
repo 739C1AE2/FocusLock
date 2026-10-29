@@ -498,7 +498,7 @@ private fun CourseSummaryCard(data: CourseTableImport) {
             )
             SummaryRow(
                 label = stringResource(R.string.summary_base_slots),
-                value = data.baseTimeTable.slots.size.toString()
+                value = data.basePeriodSchedule.slots.size.toString()
             )
         }
     }
@@ -633,12 +633,12 @@ private fun resolveIssueText(issue: CourseImportIssue): String {
             stringResource(R.string.issue_invalid_semester_start_date_skipped, issue.startDate)
 
         is CourseImportIssue.InvalidSlotSkipped ->
-            stringResource(R.string.issue_invalid_slot_skipped, issue.timeTableName, issue.slot)
+            stringResource(R.string.issue_invalid_slot_skipped, issue.periodScheduleName, issue.slot)
 
         is CourseImportIssue.InvalidSeasonStartDateFallback ->
             stringResource(
                 R.string.issue_invalid_start_date_fallback,
-                issue.timeTableName,
+                issue.periodScheduleName,
                 issue.startDate,
                 issue.defaultEpochDay.epochDayToDateString()
             )
@@ -646,7 +646,7 @@ private fun resolveIssueText(issue: CourseImportIssue): String {
         is CourseImportIssue.InvalidSeasonEndDateFallback ->
             stringResource(
                 R.string.issue_invalid_end_date_fallback,
-                issue.timeTableName,
+                issue.periodScheduleName,
                 issue.endDate,
                 issue.defaultEpochDay.epochDayToDateString()
             )
@@ -695,7 +695,7 @@ private fun resolveIssueText(issue: CourseImportIssue): String {
             stringResource(R.string.issue_sleepy_declared_course_count_mismatch, issue.declaredCount, issue.actualCount)
 
         is CourseImportIssue.SleepyDeclaredTimeSlotsCountMismatch ->
-            stringResource(R.string.issue_sleepy_declared_time_slots_count_mismatch, issue.timeTableName, issue.declaredCount, issue.actualCount)
+            stringResource(R.string.issue_sleepy_declared_time_slots_count_mismatch, issue.periodScheduleName, issue.declaredCount, issue.actualCount)
 
         is CourseImportIssue.SleepyChecksumAlgorithmUnsupported ->
             stringResource(R.string.issue_sleepy_checksum_algorithm_unsupported, issue.algorithm)
@@ -706,38 +706,38 @@ private fun resolveIssueText(issue: CourseImportIssue): String {
         is CourseImportIssue.InvalidSlotRemoved ->
             stringResource(
                 R.string.issue_invalid_slot_removed,
-                issue.timeTableName,
+                issue.periodScheduleName,
                 issue.slot.toDisplayString()
             )
 
         is CourseImportIssue.ConflictingSlotsNumbersRemoved ->
             stringResource(
                 R.string.issue_conflicting_slots_removed,
-                issue.timeTableName,
+                issue.periodScheduleName,
                 issue.numbers.joinToString(", ")
             )
 
         is CourseImportIssue.OverlappingSlotsRemoved ->
             stringResource(
                 R.string.issue_overlapping_slots_removed,
-                issue.timeTableName,
+                issue.periodScheduleName,
                 issue.numbers.joinToString(", ")
             )
 
         is CourseImportIssue.NonChronologicalSlotsRemoved ->
             stringResource(
                 R.string.issue_non_chronological_slots_removed,
-                issue.timeTableName,
+                issue.periodScheduleName,
                 issue.numbers.joinToString(", ")
             )
 
-        is CourseImportIssue.EmptySeasonalTimeTableRemoved ->
-            stringResource(R.string.issue_empty_seasonal_timetable_removed, issue.timeTableName)
+        is CourseImportIssue.EmptySeasonalPeriodScheduleRemoved ->
+            stringResource(R.string.issue_empty_seasonal_period_schedule_removed, issue.periodScheduleName)
 
-        is CourseImportIssue.TimeTableClearedForSectionGap ->
+        is CourseImportIssue.PeriodScheduleClearedForSectionGap ->
             stringResource(
-                R.string.issue_timetable_cleared_section_gap,
-                issue.timeTableName,
+                R.string.issue_period_schedule_cleared_section_gap,
+                issue.periodScheduleName,
                 issue.section
             )
 
@@ -751,8 +751,8 @@ private fun resolveIssueText(issue: CourseImportIssue): String {
                 issue.sessionTime.toDisplayString()
             )
 
-        is CourseImportIssue.NoValidTimeTable ->
-            stringResource(R.string.issue_no_valid_timetable)
+        is CourseImportIssue.NoValidPeriodSchedule ->
+            stringResource(R.string.issue_no_valid_period_schedule)
 
         is CourseImportIssue.UnknownSectionReferences ->
             stringResource(
@@ -782,7 +782,7 @@ private fun resolveIssueText(issue: CourseImportIssue): String {
         is CourseImportIssue.InvalidSeasonDateRangeFallback ->
               stringResource(
                  R.string.issue_invalid_season_date_range_fallback,
-                 issue.timeTableName,
+                 issue.periodScheduleName,
                  issue.adjustedStartEpochDay.epochDayToDateString(),
                  issue.adjustedEndEpochDay.epochDayToDateString()
                 )

@@ -374,7 +374,7 @@ private fun SessionCard(
                 FilterChip(
                     selected = session.time is SessionTimeDraft.Sections,
                     onClick = { onUpdate { it.copy(time = SessionTimeDraft.Sections()) } },
-                    label = { Text(stringResource(R.string.session_follow_timetable)) }
+                    label = { Text(stringResource(R.string.session_follow_period_schedule)) }
                 )
                 FilterChip(
                     selected = session.time is SessionTimeDraft.Custom,

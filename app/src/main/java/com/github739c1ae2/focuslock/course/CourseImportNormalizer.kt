@@ -41,8 +41,8 @@ object CourseImportNormalizer {
                 ).coerceAtLeast(minEpochDay)
 
         val baseSlots = normalizeSlots(
-            input.baseTimeTable.slots,
-            input.baseTimeTable.name,
+            input.basePeriodSchedule.slots,
+            input.basePeriodSchedule.name,
             issues
         ).toMutableList()
 
@@ -58,7 +58,7 @@ object CourseImportNormalizer {
                 table
             } else {
                 issues += CourseImportIssue.InvalidSeasonDateRangeFallback(
-                    timeTableName = table.name,
+                    periodScheduleName = table.name,
                     adjustedStartEpochDay = fallbackEpochDay,
                     adjustedEndEpochDay = fallbackEpochDay
                 )
@@ -76,7 +76,7 @@ object CourseImportNormalizer {
 
         // 只按原始编号对齐。遇到内部缺口时清空对应列表。
         reconcileSectionRows(
-            baseTimeTableName = input.baseTimeTable.name,
+            basePeriodScheduleName = input.basePeriodSchedule.name,
             baseSlots = baseSlots,
             seasons = seasons,
             courses = courses,
@@ -87,23 +87,23 @@ object CourseImportNormalizer {
         val validSeasons = seasons.filter {
             val empty = it.slots.isEmpty()
             if (empty) {
-                issues += CourseImportIssue.EmptySeasonalTimeTableRemoved(
-                    timeTableName = it.name
+                issues += CourseImportIssue.EmptySeasonalPeriodScheduleRemoved(
+                    periodScheduleName = it.name
                 )
             }
             !empty
         }
 
-        val normalizedBaseTimeTable: TimeTableImport
-        val normalizedSeasons: List<TimeTableImport>
+        val normalizedBasePeriodSchedule: PeriodScheduleImport
+        val normalizedSeasons: List<PeriodScheduleImport>
         val normalizedCourses: List<CourseImport>
 
         if (baseSlots.isEmpty() && validSeasons.isEmpty()) {
-            val shifted = courses.shiftWithoutTimeTables()
-            normalizedBaseTimeTable = input.baseTimeTable.copy(slots = emptyList())
+            val shifted = courses.shiftWithoutPeriodSchedules()
+            normalizedBasePeriodSchedule = input.basePeriodSchedule.copy(slots = emptyList())
             normalizedSeasons = emptyList()
             normalizedCourses = shifted
-            issues += CourseImportIssue.NoValidTimeTable
+            issues += CourseImportIssue.NoValidPeriodSchedule
         } else {
             // 统一重编号。
             val mapping = buildSet {
@@ -117,7 +117,7 @@ object CourseImportNormalizer {
                 .mapIndexed { index, number -> number to index + 1 }
                 .toMap()
 
-            normalizedBaseTimeTable = input.baseTimeTable.copy(
+            normalizedBasePeriodSchedule = input.basePeriodSchedule.copy(
                 slots = baseSlots.remapNumbers(mapping)
             )
 
@@ -128,7 +128,7 @@ object CourseImportNormalizer {
             normalizedCourses = remapCourses(courses, mapping)
 
             val defined = buildSet {
-                addAll(normalizedBaseTimeTable.slots.map { it.number })
+                addAll(normalizedBasePeriodSchedule.slots.map { it.number })
                 normalizedSeasons.forEach { table ->
                     addAll(table.slots.map { it.number })
                 }
@@ -145,7 +145,7 @@ object CourseImportNormalizer {
         var data = input.copy(
             semesterStartEpochDay = semesterStartEpochDay,
             totalWeeks = totalWeeks,
-            baseTimeTable = normalizedBaseTimeTable,
+            basePeriodSchedule = normalizedBasePeriodSchedule,
             seasonalTables = normalizedSeasons,
             courses = normalizedCourses
         )
@@ -167,7 +167,7 @@ object CourseImportNormalizer {
             val valid = it.isValid()
             if (!valid) {
                 issues += CourseImportIssue.InvalidSlotRemoved(
-                    timeTableName = name,
+                    periodScheduleName = name,
                     slot = it
                 )
             }
@@ -197,7 +197,7 @@ object CourseImportNormalizer {
 
         if (conflicting.isNotEmpty()) {
             issues += CourseImportIssue.ConflictingSlotsNumbersRemoved(
-                timeTableName = name,
+                periodScheduleName = name,
                 numbers = conflicting.toList()
             )
         }
@@ -220,7 +220,7 @@ object CourseImportNormalizer {
         }
         if (overlapping.isNotEmpty()) {
             issues += CourseImportIssue.OverlappingSlotsRemoved(
-                timeTableName = name,
+                periodScheduleName = name,
                 numbers = overlapping.toList()
             )
         }
@@ -244,7 +244,7 @@ object CourseImportNormalizer {
         }
         if (outOfOrder.isNotEmpty()) {
             issues += CourseImportIssue.NonChronologicalSlotsRemoved(
-                timeTableName = name,
+                periodScheduleName = name,
                 numbers = outOfOrder.toList()
             )
         }
@@ -253,9 +253,9 @@ object CourseImportNormalizer {
     }
 
     private fun reconcileSectionRows(
-        baseTimeTableName: String,
+        basePeriodScheduleName: String,
         baseSlots: MutableList<TimeSlot>,
-        seasons: MutableList<TimeTableImport>,
+        seasons: MutableList<PeriodScheduleImport>,
         courses: List<CourseImport>,
         issues: MutableList<CourseImportIssue.Normalization>
     ) {
@@ -271,8 +271,8 @@ object CourseImportNormalizer {
             if (baseSlots.hasGapAt(number)) {
                 baseSlots.clear()
 
-                issues += CourseImportIssue.TimeTableClearedForSectionGap(
-                    timeTableName = baseTimeTableName,
+                issues += CourseImportIssue.PeriodScheduleClearedForSectionGap(
+                    periodScheduleName = basePeriodScheduleName,
                     section = number
                 )
             }
@@ -283,8 +283,8 @@ object CourseImportNormalizer {
                 if (table.slots.hasGapAt(number)) {
                     seasons[index] = table.copy(slots = emptyList())
 
-                    issues += CourseImportIssue.TimeTableClearedForSectionGap(
-                        timeTableName = table.name,
+                    issues += CourseImportIssue.PeriodScheduleClearedForSectionGap(
+                        periodScheduleName = table.name,
                         section = number
                     )
                 }
@@ -436,7 +436,7 @@ object CourseImportNormalizer {
         }
 
     // 没有有效作息表时，只统一平移课程引用
-    private fun List<CourseImport>.shiftWithoutTimeTables(): List<CourseImport> {
+    private fun List<CourseImport>.shiftWithoutPeriodSchedules(): List<CourseImport> {
         val references = referencedNumbers(this)
         if (references.isEmpty()) return this
 

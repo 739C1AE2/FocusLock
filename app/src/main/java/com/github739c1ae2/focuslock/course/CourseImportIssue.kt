@@ -28,18 +28,18 @@ sealed class CourseImportIssue(
     ) : Parsing(CourseImportIssueSeverity.WARNING)
 
     data class InvalidSlotSkipped(
-        val timeTableName: String,
+        val periodScheduleName: String,
         val slot: String
     ) : Parsing(CourseImportIssueSeverity.WARNING)
 
     data class InvalidSeasonStartDateFallback(
-        val timeTableName: String,
+        val periodScheduleName: String,
         val startDate: String,
         val defaultEpochDay: Long
     ) : Parsing(CourseImportIssueSeverity.WARNING)
 
     data class InvalidSeasonEndDateFallback(
-        val timeTableName: String,
+        val periodScheduleName: String,
         val endDate: String,
         val defaultEpochDay: Long
     ) : Parsing(CourseImportIssueSeverity.WARNING)
@@ -86,7 +86,7 @@ sealed class CourseImportIssue(
     ) : Parsing(CourseImportIssueSeverity.WARNING)
 
     data class SleepyDeclaredTimeSlotsCountMismatch(
-        val timeTableName: String,
+        val periodScheduleName: String,
         val declaredCount: Int,
         val actualCount: Int
     ) : Parsing(CourseImportIssueSeverity.WARNING)
@@ -102,37 +102,37 @@ sealed class CourseImportIssue(
     object InvalidSemesterStartEpochDayRemoved : Normalization(CourseImportIssueSeverity.WARNING)
 
     data class InvalidSeasonDateRangeFallback(
-        val timeTableName: String,
+        val periodScheduleName: String,
         val adjustedStartEpochDay: Long,
         val adjustedEndEpochDay: Long
     ) : Normalization(CourseImportIssueSeverity.WARNING)
 
     data class InvalidSlotRemoved(
-        val timeTableName: String,
+        val periodScheduleName: String,
         val slot: TimeSlot
     ) : Normalization(CourseImportIssueSeverity.WARNING)
 
     data class ConflictingSlotsNumbersRemoved(
-        val timeTableName: String,
+        val periodScheduleName: String,
         val numbers: List<Int>
     ) : Normalization(CourseImportIssueSeverity.WARNING)
 
     data class OverlappingSlotsRemoved(
-        val timeTableName: String,
+        val periodScheduleName: String,
         val numbers: List<Int>
     ) : Normalization(CourseImportIssueSeverity.WARNING)
 
     data class NonChronologicalSlotsRemoved(
-        val timeTableName: String,
+        val periodScheduleName: String,
         val numbers: List<Int>
     ) : Normalization(CourseImportIssueSeverity.WARNING)
 
-    data class EmptySeasonalTimeTableRemoved(
-        val timeTableName: String,
+    data class EmptySeasonalPeriodScheduleRemoved(
+        val periodScheduleName: String,
     ) : Normalization(CourseImportIssueSeverity.WARNING)
 
-    data class TimeTableClearedForSectionGap(
-        val timeTableName: String,
+    data class PeriodScheduleClearedForSectionGap(
+        val periodScheduleName: String,
         val section: Int
     ) : Normalization(CourseImportIssueSeverity.WARNING)
 
@@ -160,7 +160,7 @@ sealed class CourseImportIssue(
         val sessionTime: CourseSessionTime,
     ) : Normalization(CourseImportIssueSeverity.WARNING)
 
-    object NoValidTimeTable : Normalization(CourseImportIssueSeverity.WARNING)
+    object NoValidPeriodSchedule : Normalization(CourseImportIssueSeverity.WARNING)
 
     data class UnknownSectionReferences(
         val numbers: List<Int>

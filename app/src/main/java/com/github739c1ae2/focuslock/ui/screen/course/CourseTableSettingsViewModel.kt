@@ -5,7 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.github739c1ae2.focuslock.database.COURSE_TABLE_ID
 import com.github739c1ae2.focuslock.database.CourseRepository
 import com.github739c1ae2.focuslock.database.CourseTableEntity
-import com.github739c1ae2.focuslock.database.CourseTimeTableEntity
+import com.github739c1ae2.focuslock.database.CoursePeriodScheduleEntity
 import com.github739c1ae2.focuslock.util.EditorState
 import com.github739c1ae2.focuslock.util.ValidationResult
 import com.github739c1ae2.focuslock.util.edit
@@ -43,7 +43,7 @@ sealed class TableSettingsState(open val isDirty: Boolean) {
 
 sealed interface TableSettingsEvent {
     object Saved : TableSettingsEvent
-    data class OpenTimeTable(val timeTableId: Long) : TableSettingsEvent
+    data class OpenPeriodSchedule(val periodScheduleId: Long) : TableSettingsEvent
 }
 
 @HiltViewModel
@@ -60,7 +60,7 @@ class CourseTableSettingsViewModel @Inject constructor(
         }
     }.stateIn(viewModelScope, SharingStarted.Eagerly, TableSettingsState.Loading)
 
-    val timeTables: StateFlow<List<CourseTimeTableEntity>> = repository.observeTimeTableEntities()
+    val periodSchedules: StateFlow<List<CoursePeriodScheduleEntity>> = repository.observePeriodScheduleEntities()
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
@@ -112,15 +112,15 @@ class CourseTableSettingsViewModel @Inject constructor(
         }
     }
 
-    fun addTimeTable(name: String) {
+    fun addPeriodSchedule(name: String) {
         viewModelScope.launch {
             val today = LocalDate.now().toEpochDay()
-            val id = repository.createTimeTable(
+            val id = repository.createPeriodSchedule(
                 name = name,
                 startEpochDay = today,
                 endEpochDay = today + 30
             )
-            eventFlow.emit(TableSettingsEvent.OpenTimeTable(id))
+            eventFlow.emit(TableSettingsEvent.OpenPeriodSchedule(id))
         }
     }
 

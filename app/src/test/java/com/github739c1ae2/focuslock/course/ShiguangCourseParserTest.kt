@@ -37,8 +37,8 @@ class ShiguangCourseParserTest {
         assertEquals(
             CourseTableImport(
                 semesterStartEpochDay = semesterStart, totalWeeks = 18, firstDayOfWeek = DayOfWeek.SUNDAY,
-                baseTimeTable = TimeTableImport(DEFAULT_BASE_TIME_TABLE_NAME, slots = listOf(TimeSlot(1, 480, 525, "早课"))),
-                seasonalTables = listOf(TimeTableImport(
+                basePeriodSchedule = PeriodScheduleImport(DEFAULT_BASE_PERIOD_SCHEDULE_NAME, slots = listOf(TimeSlot(1, 480, 525, "早课"))),
+                seasonalTables = listOf(PeriodScheduleImport(
                     "冬季作息", LocalDate.of(2026, 11, 1).toEpochDay(), LocalDate.of(2026, 12, 31).toEpochDay(),
                     listOf(TimeSlot(1, 510, 555))
                 )),
@@ -58,7 +58,7 @@ class ShiguangCourseParserTest {
 
         assertEquals(CourseTableImport(
             null, 20, DayOfWeek.MONDAY,
-            TimeTableImport(DEFAULT_BASE_TIME_TABLE_NAME, slots = emptyList()), emptyList(), emptyList()
+            PeriodScheduleImport(DEFAULT_BASE_PERIOD_SCHEDULE_NAME, slots = emptyList()), emptyList(), emptyList()
         ), result.data)
         assertTrue(result.issues.isEmpty())
     }
@@ -166,11 +166,11 @@ class ShiguangCourseParserTest {
             {"number":3,"startTime":"10:00","endTime":"10:45","alias":"第三节"}
         ]"""))
 
-        assertEquals(listOf(TimeSlot(3, 600, 645, "第三节")), result.data.baseTimeTable.slots)
+        assertEquals(listOf(TimeSlot(3, 600, 645, "第三节")), result.data.basePeriodSchedule.slots)
         val issues = result.issues.filterIsInstance<CourseImportIssue.InvalidSlotSkipped>()
         assertEquals(2, issues.size)
         assertEquals(issues, result.issues)
-        assertTrue(issues.all { it.timeTableName == DEFAULT_BASE_TIME_TABLE_NAME && it.slot.length <= 120 })
+        assertTrue(issues.all { it.periodScheduleName == DEFAULT_BASE_PERIOD_SCHEDULE_NAME && it.slot.length <= 120 })
     }
 
     /** 季节作息开始日期无效时，优先回退到开学前一天；无开学日期时使用合法结束日期。 */

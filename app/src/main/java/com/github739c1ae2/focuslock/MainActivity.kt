@@ -53,7 +53,7 @@ import com.github739c1ae2.focuslock.ui.screen.course.CourseEditorScreen
 import com.github739c1ae2.focuslock.ui.screen.course.CourseListScreen
 import com.github739c1ae2.focuslock.ui.screen.course.CourseTableImportScreen
 import com.github739c1ae2.focuslock.ui.screen.course.CourseTableSettingsScreen
-import com.github739c1ae2.focuslock.ui.screen.course.TimeTableEditorScreen
+import com.github739c1ae2.focuslock.ui.screen.course.PeriodScheduleEditorScreen
 import com.github739c1ae2.focuslock.ui.screen.home.HomeScreen
 import com.github739c1ae2.focuslock.ui.screen.profile.AdapterConfigResult
 import com.github739c1ae2.focuslock.ui.screen.profile.ProfileEditScreen
@@ -374,20 +374,20 @@ fun MainApp() {
                                 navigator.forceGoBack(key)
                             }
                         },
-                        onOpenTimeTable = { timeTableId ->
+                        onOpenPeriodSchedule = { periodScheduleId ->
                             navigator.popToAndPush(
                                 anchor = key,
-                                target = AppRoute.TimeTableEditor(timeTableId)
+                                target = AppRoute.PeriodScheduleEditor(periodScheduleId)
                             )
                         }
                     )
                 }
-                entry<AppRoute.TimeTableEditor>(
+                entry<AppRoute.PeriodScheduleEditor>(
                     metadata = ListDetailSceneStrategy.detailPane(sceneKey = "Course")
                 ) { key ->
                     val isListDetailScene = LocalListDetailSceneScope.current != null
-                    TimeTableEditorScreen(
-                        timeTableId = key.timeTableId,
+                    PeriodScheduleEditorScreen(
+                        periodScheduleId = key.periodScheduleId,
                         isSinglePane = !isListDetailScene,
                         onBack = { navigator.safeGoBack(key) },
                         onDirtyChange = { navigator.setRouteDirty(key, it) },

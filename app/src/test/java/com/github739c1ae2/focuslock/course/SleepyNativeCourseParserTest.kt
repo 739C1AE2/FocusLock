@@ -29,8 +29,8 @@ class SleepyNativeCourseParserTest {
 
         assertEquals(CourseTableImport(
             semesterStart, 18, DayOfWeek.MONDAY,
-            TimeTableImport(DEFAULT_BASE_TIME_TABLE_NAME, slots = listOf(TimeSlot(1, 480, 525), TimeSlot(2, 535, 580))),
-            listOf(TimeTableImport("冬季", semesterStart - 1, semesterStart - 1, listOf(TimeSlot(1, 540, 585)))),
+            PeriodScheduleImport(DEFAULT_BASE_PERIOD_SCHEDULE_NAME, slots = listOf(TimeSlot(1, 480, 525), TimeSlot(2, 535, 580))),
+            listOf(PeriodScheduleImport("冬季", semesterStart - 1, semesterStart - 1, listOf(TimeSlot(1, 540, 585)))),
             listOf(CourseImport("数学", listOf(
                 SessionImport("张老师", "A101", DayOfWeek.MONDAY, CourseSessionTime.Sections(1, 2), setOf(1, 3, 5)),
                 SessionImport("李老师", "B202", DayOfWeek.FRIDAY, CourseSessionTime.Custom(840, 930), setOf(2, 4))
@@ -74,7 +74,7 @@ class SleepyNativeCourseParserTest {
 
         assertEquals(CourseTableImport(
             null, 20, DayOfWeek.MONDAY,
-            TimeTableImport(DEFAULT_BASE_TIME_TABLE_NAME, slots = emptyList()), emptyList(), emptyList()
+            PeriodScheduleImport(DEFAULT_BASE_PERIOD_SCHEDULE_NAME, slots = emptyList()), emptyList(), emptyList()
         ), result.data)
         assertTrue(result.issues.isEmpty())
     }
@@ -268,7 +268,7 @@ class SleepyNativeCourseParserTest {
     @Test
     fun defaultSlotsAllowExplicitOverrides() {
         val result = parse(document("Nd", "N1|07:30|08:15"))
-        val slots = result.data.baseTimeTable.slots
+        val slots = result.data.basePeriodSchedule.slots
 
         assertEquals((1..12).toList(), slots.map { it.number })
         assertEquals(TimeSlot(1, 450, 495), slots.first())
@@ -293,13 +293,13 @@ class SleepyNativeCourseParserTest {
 
     /** 损坏作息行单独告警并跳过，不影响基础和季节中的其他合法行。 */
     @Test
-    fun malformedSlotsReportTheirTimeTable() {
+    fun malformedSlotsReportTheirPeriodSchedule() {
         val result = parse(document("Nbad|08:00|08:45", "N1|08:00|08:45", "P冬季|7|1", "Pn2|25:00|09:45", "Pn1|09:00|09:45"))
 
-        assertEquals(listOf(TimeSlot(1, 480, 525)), result.data.baseTimeTable.slots)
+        assertEquals(listOf(TimeSlot(1, 480, 525)), result.data.basePeriodSchedule.slots)
         assertEquals(listOf(TimeSlot(1, 540, 585)), result.data.seasonalTables.single().slots)
         assertEquals(listOf(
-            CourseImportIssue.InvalidSlotSkipped(DEFAULT_BASE_TIME_TABLE_NAME, "Nbad|08:00|08:45"),
+            CourseImportIssue.InvalidSlotSkipped(DEFAULT_BASE_PERIOD_SCHEDULE_NAME, "Nbad|08:00|08:45"),
             CourseImportIssue.InvalidSlotSkipped("冬季", "Pn2|25:00|09:45")
         ), result.issues)
     }
@@ -342,7 +342,7 @@ class SleepyNativeCourseParserTest {
         assertEquals(1, result.data.courses.size)
         assertEquals(listOf(
             CourseImportIssue.SleepyDeclaredCourseCountMismatch(3, 1),
-            CourseImportIssue.SleepyDeclaredTimeSlotsCountMismatch(DEFAULT_BASE_TIME_TABLE_NAME, 2, 1),
+            CourseImportIssue.SleepyDeclaredTimeSlotsCountMismatch(DEFAULT_BASE_PERIOD_SCHEDULE_NAME, 2, 1),
             CourseImportIssue.SleepyDeclaredTimeSlotsCountMismatch("冬季", 2, 1)
         ), result.issues)
     }

@@ -18,11 +18,11 @@ class CourseImportUseCase @Inject constructor(
         baseProfileId: Long
     ) = database.withWriteTransaction {
         val courseTable = courseRepository.getCourseTable()
-        val baseTimeTable = courseRepository.getBaseTimeTable(courseTable.id)
+        val basePeriodSchedule = courseRepository.getBasePeriodSchedule(courseTable.id)
 
         // 清空旧内容，保留下课表与基础作息
         courseRepository.deleteCourses(courseTable.id)
-        courseRepository.deleteNonBaseTimeTables(courseTable.id)
+        courseRepository.deleteNonBasePeriodSchedules(courseTable.id)
 
         courseRepository.updateCourseTable(
             courseTable.copy(
@@ -32,20 +32,20 @@ class CourseImportUseCase @Inject constructor(
             )
         )
 
-        courseRepository.upsertTimeTable(
-            TimeTable(
-                id = baseTimeTable.id,
-                name = tableImport.baseTimeTable.name,
+        courseRepository.upsertPeriodSchedule(
+            PeriodSchedule(
+                id = basePeriodSchedule.id,
+                name = tableImport.basePeriodSchedule.name,
                 isBase = true,
                 startEpochDay = LocalDate.MIN.toEpochDay(),
                 endEpochDay = LocalDate.MAX.toEpochDay(),
-                slots = tableImport.baseTimeTable.slots
+                slots = tableImport.basePeriodSchedule.slots
             )
         )
 
         tableImport.seasonalTables.forEach { season ->
-            courseRepository.upsertTimeTable (
-                TimeTable(
+            courseRepository.upsertPeriodSchedule (
+                PeriodSchedule(
                     id = 0L,
                     name = season.name,
                     isBase = false,

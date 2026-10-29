@@ -4,7 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.github739c1ae2.focuslock.database.CourseRepository
 import com.github739c1ae2.focuslock.database.TimeSlot
-import com.github739c1ae2.focuslock.database.TimeTable
+import com.github739c1ae2.focuslock.database.PeriodSchedule
 import com.github739c1ae2.focuslock.util.EditorState
 import com.github739c1ae2.focuslock.util.ValidationResult
 import com.github739c1ae2.focuslock.util.edit
@@ -26,7 +26,7 @@ import kotlinx.coroutines.launch
 
 data class TimeSlotDraft(val key: Long, val startMinute: Int, val endMinute: Int, val alias: String)
 
-data class TimeTableDraft(
+data class PeriodScheduleDraft(
     val isBase: Boolean,
     val name: String,
     val startEpochDay: Long,
@@ -34,36 +34,36 @@ data class TimeTableDraft(
     val slots: List<TimeSlotDraft>
 )
 
-sealed class TimeTableEditorState(open val isDirty: Boolean) {
-    data object Loading : TimeTableEditorState(false)
-    data object Failed : TimeTableEditorState(false)
+sealed class PeriodScheduleEditorState(open val isDirty: Boolean) {
+    data object Loading : PeriodScheduleEditorState(false)
+    data object Failed : PeriodScheduleEditorState(false)
     data class Loaded(
-        val draft: TimeTableDraft,
+        val draft: PeriodScheduleDraft,
         override val isDirty: Boolean,
-        val validation: ValidationResult<TimeTableField>
-    ) : TimeTableEditorState(isDirty)
+        val validation: ValidationResult<PeriodScheduleField>
+    ) : PeriodScheduleEditorState(isDirty)
 }
 
-sealed interface TimeTableEditorEvent {
-    data object Saved : TimeTableEditorEvent
-    data object Deleted : TimeTableEditorEvent
+sealed interface PeriodScheduleEditorEvent {
+    data object Saved : PeriodScheduleEditorEvent
+    data object Deleted : PeriodScheduleEditorEvent
 }
 
-@HiltViewModel(assistedFactory = TimeTableEditorViewModel.Factory::class)
-class TimeTableEditorViewModel @AssistedInject constructor(
+@HiltViewModel(assistedFactory = PeriodScheduleEditorViewModel.Factory::class)
+class PeriodScheduleEditorViewModel @AssistedInject constructor(
     private val repository: CourseRepository,
-    @Assisted private val timeTableId: Long
+    @Assisted private val periodScheduleId: Long
 ) : ViewModel() {
-    private val drafts = MutableStateFlow<EditorState<TimeTableDraft>>(EditorState.Loading)
-    private val context: StateFlow<TimeTableValidationContext?> = repository.observeTimeTableEntities()
-        .map { TimeTableValidationContext(timeTableId, it) }
+    private val drafts = MutableStateFlow<EditorState<PeriodScheduleDraft>>(EditorState.Loading)
+    private val context: StateFlow<PeriodScheduleValidationContext?> = repository.observePeriodScheduleEntities()
+        .map { PeriodScheduleValidationContext(periodScheduleId, it) }
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
-    val state: StateFlow<TimeTableEditorState> = timeTableEditorStates(drafts, context)
-        .stateIn(viewModelScope, SharingStarted.Eagerly, TimeTableEditorState.Loading)
+    val state: StateFlow<PeriodScheduleEditorState> = periodScheduleEditorStates(drafts, context)
+        .stateIn(viewModelScope, SharingStarted.Eagerly, PeriodScheduleEditorState.Loading)
 
-    val eventFlow: SharedFlow<TimeTableEditorEvent>
-        field = MutableSharedFlow<TimeTableEditorEvent>()
+    val eventFlow: SharedFlow<PeriodScheduleEditorEvent>
+        field = MutableSharedFlow<PeriodScheduleEditorEvent>()
 
     private var nextKey = 1L
     private var loadJob: Job? = null
@@ -74,17 +74,17 @@ class TimeTableEditorViewModel @AssistedInject constructor(
         loadJob?.cancel()
         drafts.value = EditorState.Loading
         loadJob = viewModelScope.launch {
-            val timeTable = repository.getTimeTable(timeTableId)
-            if (timeTable == null) {
+            val periodSchedule = repository.getPeriodSchedule(periodScheduleId)
+            if (periodSchedule == null) {
                 drafts.value = EditorState.Failed
                 return@launch
             }
-            val draft = TimeTableDraft(
-                isBase = timeTable.isBase,
-                name = timeTable.name,
-                startEpochDay = timeTable.startEpochDay,
-                endEpochDay = timeTable.endEpochDay,
-                slots = timeTable.slots.map { slot ->
+            val draft = PeriodScheduleDraft(
+                isBase = periodSchedule.isBase,
+                name = periodSchedule.name,
+                startEpochDay = periodSchedule.startEpochDay,
+                endEpochDay = periodSchedule.endEpochDay,
+                slots = periodSchedule.slots.map { slot ->
                     TimeSlotDraft(
                         key = nextKey++,
                         startMinute = slot.startMinute.coerceIn(0, 1438),
@@ -93,12 +93,12 @@ class TimeTableEditorViewModel @AssistedInject constructor(
                     )
                 }
             )
-            drafts.value = EditorState.Loaded(normalizeTimeTable(draft))
+            drafts.value = EditorState.Loaded(normalizePeriodSchedule(draft))
         }
     }
 
-    fun updateDraft(transform: (TimeTableDraft) -> TimeTableDraft) =
-        drafts.edit { normalizeTimeTable(transform(it)) }
+    fun updateDraft(transform: (PeriodScheduleDraft) -> PeriodScheduleDraft) =
+        drafts.edit { normalizePeriodSchedule(transform(it)) }
 
     fun updateStartEpochDay(epochDay: Long) = updateDraft { it.copy(startEpochDay = epochDay) }
     fun updateEndEpochDay(epochDay: Long) = updateDraft { it.copy(endEpochDay = epochDay) }
@@ -123,11 +123,11 @@ class TimeTableEditorViewModel @AssistedInject constructor(
 
     fun save() {
         val currentContext = context.value ?: return
-        val snapshot = drafts.validatedSnapshot { validateTimeTable(it, currentContext) } ?: return
+        val snapshot = drafts.validatedSnapshot { validatePeriodSchedule(it, currentContext) } ?: return
         val draft = snapshot.draft
         viewModelScope.launch {
-            repository.upsertTimeTable(TimeTable(
-                id = timeTableId,
+            repository.upsertPeriodSchedule(PeriodSchedule(
+                id = periodScheduleId,
                 name = draft.name.trim(),
                 isBase = draft.isBase,
                 startEpochDay = draft.startEpochDay,
@@ -137,7 +137,7 @@ class TimeTableEditorViewModel @AssistedInject constructor(
                 }
             ))
             if (drafts.markSaved(snapshot)) {
-                eventFlow.emit(TimeTableEditorEvent.Saved)
+                eventFlow.emit(PeriodScheduleEditorEvent.Saved)
             }
         }
     }
@@ -146,14 +146,14 @@ class TimeTableEditorViewModel @AssistedInject constructor(
         val snapshot = drafts.value as? EditorState.Loaded ?: return
         if (snapshot.draft.isBase) return
         viewModelScope.launch {
-            repository.deleteTimeTable(timeTableId)
+            repository.deletePeriodSchedule(periodScheduleId)
             drafts.value = EditorState.Failed
-            eventFlow.emit(TimeTableEditorEvent.Deleted)
+            eventFlow.emit(PeriodScheduleEditorEvent.Deleted)
         }
     }
 
     @AssistedFactory
     interface Factory {
-        fun create(timeTableId: Long): TimeTableEditorViewModel
+        fun create(periodScheduleId: Long): PeriodScheduleEditorViewModel
     }
 }

@@ -169,7 +169,7 @@ class LockEngine @AssistedInject constructor(
                     "schedules",
                     "quick_lock",
                     "course_tables",
-                    "course_time_tables",
+                    "course_period_schedules",
                     "course_time_slots",
                     "courses",
                     "course_sessions",

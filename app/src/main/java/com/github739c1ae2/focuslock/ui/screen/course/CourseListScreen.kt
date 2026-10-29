@@ -251,7 +251,7 @@ private fun CourseTableSummaryCard(
             )
             if (table.semesterStartEpochDay == null) {
                 Text(
-                    text = stringResource(R.string.timetable_unset_hint),
+                    text = stringResource(R.string.course_table_unset_hint),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error
                 )

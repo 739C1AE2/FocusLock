@@ -34,7 +34,7 @@ sealed interface CourseTableParseResult {
 }
 
 // FIXME: 这里使用了硬编码字符串，应当使用资源文件
-const val DEFAULT_BASE_TIME_TABLE_NAME = "基础作息"
+const val DEFAULT_BASE_PERIOD_SCHEDULE_NAME = "基础作息"
 
 sealed class CourseImportParser<I : ParserSource> {
     @get:StringRes

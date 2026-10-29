@@ -144,7 +144,7 @@ object SleepyNativeCourseParser : CourseImportFileParser(
                             body = line.substring(1),
                             rawLine = line,
                             destination = baseSlotTimes,
-                            timeTableName = DEFAULT_BASE_TIME_TABLE_NAME,
+                            periodScheduleName = DEFAULT_BASE_PERIOD_SCHEDULE_NAME,
                             issues = issues,
                         )
                     }
@@ -158,7 +158,7 @@ object SleepyNativeCourseParser : CourseImportFileParser(
                                 body = line.substring(2),
                                 rawLine = line,
                                 destination = periodSlotTimes,
-                                timeTableName = periodHeader?.name ?: "Sleepy 独立作息",
+                                periodScheduleName = periodHeader?.name ?: "Sleepy 独立作息",
                                 issues = issues,
                             )
                         }
@@ -249,7 +249,7 @@ object SleepyNativeCourseParser : CourseImportFileParser(
 
         if (header?.nodesPerDay != null && header.nodesPerDay != finalBaseSlots.size) {
             issues += CourseImportIssue.SleepyDeclaredTimeSlotsCountMismatch(
-                timeTableName = DEFAULT_BASE_TIME_TABLE_NAME,
+                periodScheduleName = DEFAULT_BASE_PERIOD_SCHEDULE_NAME,
                 declaredCount = header.nodesPerDay,
                 actualCount = finalBaseSlots.size,
             )
@@ -260,13 +260,13 @@ object SleepyNativeCourseParser : CourseImportFileParser(
                 val start = (header?.semesterStartEpochDay?: LocalDate.now().toEpochDay()) - 1
                 if (periodHeader.nodesPerDay != finalPeriodSlots.size) {
                     issues += CourseImportIssue.SleepyDeclaredTimeSlotsCountMismatch(
-                        timeTableName = periodHeader.name,
+                        periodScheduleName = periodHeader.name,
                         declaredCount = periodHeader.nodesPerDay,
                         actualCount = finalPeriodSlots.size,
                     )
                 }
                 add(
-                    TimeTableImport(
+                    PeriodScheduleImport(
                         name = periodHeader.name,
                         startEpochDay = start,
                         endEpochDay = start,
@@ -282,8 +282,8 @@ object SleepyNativeCourseParser : CourseImportFileParser(
                 semesterStartEpochDay = header?.semesterStartEpochDay,
                 totalWeeks = header?.totalWeeks ?: 20,
                 firstDayOfWeek = DayOfWeek.MONDAY,
-                baseTimeTable = TimeTableImport(
-                    name = DEFAULT_BASE_TIME_TABLE_NAME,
+                basePeriodSchedule = PeriodScheduleImport(
+                    name = DEFAULT_BASE_PERIOD_SCHEDULE_NAME,
                     slots = finalBaseSlots,
                 ),
                 seasonalTables = seasonalTables,
@@ -360,7 +360,7 @@ object SleepyNativeCourseParser : CourseImportFileParser(
         body: String,
         rawLine: String,
         destination: MutableList<TimeSlot>,
-        timeTableName: String,
+        periodScheduleName: String,
         issues: MutableList<CourseImportIssue.Parsing>,
     ) {
         val cols = splitEscaped(body)
@@ -368,7 +368,7 @@ object SleepyNativeCourseParser : CourseImportFileParser(
         val start = parseClockMinutes(cols.getOrNull(1).orEmpty())
         val end = parseClockMinutes(cols.getOrNull(2).orEmpty())
         if (number == null || start == null || end == null) {
-            issues += CourseImportIssue.InvalidSlotSkipped(timeTableName, rawLine.take(120))
+            issues += CourseImportIssue.InvalidSlotSkipped(periodScheduleName, rawLine.take(120))
             return
         }
         destination += TimeSlot(number, start, end, alias = "")

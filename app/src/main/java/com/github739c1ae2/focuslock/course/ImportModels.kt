@@ -9,12 +9,12 @@ data class CourseTableImport(
     val semesterStartEpochDay: Long?,
     val totalWeeks: Int,
     val firstDayOfWeek: DayOfWeek,
-    val baseTimeTable: TimeTableImport,
-    val seasonalTables: List<TimeTableImport>,
+    val basePeriodSchedule: PeriodScheduleImport,
+    val seasonalTables: List<PeriodScheduleImport>,
     val courses: List<CourseImport>
 )
 
-data class TimeTableImport(
+data class PeriodScheduleImport(
     val name: String,
     val startEpochDay: Long = LocalDate.MIN.toEpochDay(),
     val endEpochDay: Long = LocalDate.MAX.toEpochDay(),

@@ -69,15 +69,15 @@ import java.time.LocalDate
 private enum class DateTarget { START, END }
 
 @Composable
-fun TimeTableEditorScreen(
-    timeTableId: Long,
+fun PeriodScheduleEditorScreen(
+    periodScheduleId: Long,
     isSinglePane: Boolean,
     onBack: () -> Unit,
     onDirtyChange: (Boolean) -> Unit,
     onSaved: () -> Unit,
     onDeleted: () -> Unit,
-    viewModel: TimeTableEditorViewModel = hiltViewModel<TimeTableEditorViewModel, TimeTableEditorViewModel.Factory> { factory ->
-        factory.create(timeTableId)
+    viewModel: PeriodScheduleEditorViewModel = hiltViewModel<PeriodScheduleEditorViewModel, PeriodScheduleEditorViewModel.Factory> { factory ->
+        factory.create(periodScheduleId)
     }
 ) {
     val state by viewModel.state.collectAsState()
@@ -91,8 +91,8 @@ fun TimeTableEditorScreen(
     LaunchedEffect(viewModel.eventFlow) {
         viewModel.eventFlow.collect { event ->
             when (event) {
-                is TimeTableEditorEvent.Saved -> onSaved()
-                is TimeTableEditorEvent.Deleted -> onDeleted()
+                is PeriodScheduleEditorEvent.Saved -> onSaved()
+                is PeriodScheduleEditorEvent.Deleted -> onDeleted()
             }
         }
     }
@@ -102,7 +102,7 @@ fun TimeTableEditorScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = stringResource(R.string.time_tables),
+                        text = stringResource(R.string.period_schedules),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -118,7 +118,7 @@ fun TimeTableEditorScreen(
                     }
                 },
                 actions = {
-                    val loaded = state as? TimeTableEditorState.Loaded
+                    val loaded = state as? PeriodScheduleEditorState.Loaded
                     if (loaded?.draft?.isBase == false) {
                         IconButton(onClick = { showDeleteConfirm = true }) {
                             Icon(
@@ -147,7 +147,7 @@ fun TimeTableEditorScreen(
         }
     ) { innerPadding ->
         when (val state = state) {
-            is TimeTableEditorState.Loading -> {
+            is PeriodScheduleEditorState.Loading -> {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -159,7 +159,7 @@ fun TimeTableEditorScreen(
                 }
             }
 
-            is TimeTableEditorState.Failed -> {
+            is PeriodScheduleEditorState.Failed -> {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -171,8 +171,8 @@ fun TimeTableEditorScreen(
                 }
             }
 
-            is TimeTableEditorState.Loaded -> {
-                TimeTableForm(
+            is PeriodScheduleEditorState.Loaded -> {
+                PeriodScheduleForm(
                     draft = state.draft,
                     validation = state.validation,
                     innerPadding = innerPadding,
@@ -197,7 +197,7 @@ fun TimeTableEditorScreen(
 
 
     if (showDeleteConfirm) {
-        val name = (state as? TimeTableEditorState.Loaded)?.draft?.name ?: ""
+        val name = (state as? PeriodScheduleEditorState.Loaded)?.draft?.name ?: ""
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
             title = { Text(stringResource(R.string.delete)) },
@@ -221,9 +221,9 @@ fun TimeTableEditorScreen(
 }
 
 @Composable
-private fun TimeTableForm(
-    draft: TimeTableDraft,
-    validation: ValidationResult<TimeTableField>,
+private fun PeriodScheduleForm(
+    draft: PeriodScheduleDraft,
+    validation: ValidationResult<PeriodScheduleField>,
     innerPadding: PaddingValues,
     onNameChange: (String) -> Unit,
     onDateChange: (DateTarget, Long) -> Unit,
@@ -246,10 +246,10 @@ private fun TimeTableForm(
             OutlinedTextField(
                 value = draft.name,
                 onValueChange = onNameChange,
-                label = { Text(stringResource(R.string.time_table_name)) },
-                isError = validation.hasError(TimeTableField.Name),
+                label = { Text(stringResource(R.string.period_schedule_name)) },
+                isError = validation.hasError(PeriodScheduleField.Name),
                 supportingText = {
-                    validation.firstError(TimeTableField.Name)?.asString()?.let { Text(it) }
+                    validation.firstError(PeriodScheduleField.Name)?.asString()?.let { Text(it) }
                 },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
@@ -259,17 +259,17 @@ private fun TimeTableForm(
         if (!draft.isBase) {
             item {
                 DateField(
-                    label = stringResource(R.string.time_table_start_date),
+                    label = stringResource(R.string.period_schedule_start_date),
                     epochDay = draft.startEpochDay,
-                    errorMessage = validation.firstError(TimeTableField.StartDate)?.asString(),
+                    errorMessage = validation.firstError(PeriodScheduleField.StartDate)?.asString(),
                     onClick = { datePickerTarget = DateTarget.START }
                 )
             }
             item {
                 DateField(
-                    label = stringResource(R.string.time_table_end_date),
+                    label = stringResource(R.string.period_schedule_end_date),
                     epochDay = draft.endEpochDay,
-                    errorMessage = validation.firstError(TimeTableField.EndDate)?.asString(),
+                    errorMessage = validation.firstError(PeriodScheduleField.EndDate)?.asString(),
                     onClick = { datePickerTarget = DateTarget.END }
                 )
             }
@@ -307,7 +307,7 @@ private fun TimeTableForm(
                 TimeSlotEditorRow(
                     index = index,
                     slot = slot,
-                    errorMessage = validation.firstError(TimeTableField.Slot(slot.key))?.asString(),
+                    errorMessage = validation.firstError(PeriodScheduleField.Slot(slot.key))?.asString(),
                     onUpdate = { transform -> onUpdateSlot(slot.key, transform) },
                     onRemove = { onRemoveSlot(slot.key) }
                 )

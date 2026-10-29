@@ -198,7 +198,7 @@ data class CourseTableEntity(
  * 季节作息 [isBase]=false，按 [startEpochDay]..[endEpochDay] 生效。
  */
 @Entity(
-    tableName = "course_time_tables",
+    tableName = "course_period_schedules",
     foreignKeys = [
         ForeignKey(
             entity = CourseTableEntity::class,
@@ -209,7 +209,7 @@ data class CourseTableEntity(
     ],
     indices = [Index("courseTableId")]
 )
-data class CourseTimeTableEntity(
+data class CoursePeriodScheduleEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val courseTableId: Long = COURSE_TABLE_ID,
     val name: String,
@@ -232,18 +232,18 @@ data class CourseTimeTableEntity(
             onDelete = ForeignKey.CASCADE
         ),
         ForeignKey(
-            entity = CourseTimeTableEntity::class,
+            entity = CoursePeriodScheduleEntity::class,
             parentColumns = ["id"],
-            childColumns = ["timeTableId"],
+            childColumns = ["periodScheduleId"],
             onDelete = ForeignKey.CASCADE
         )
     ],
-    indices = [Index("courseTableId"), Index("timeTableId")]
+    indices = [Index("courseTableId"), Index("periodScheduleId")]
 )
 data class CourseTimeSlotEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val courseTableId: Long = COURSE_TABLE_ID,
-    val timeTableId: Long,
+    val periodScheduleId: Long,
     val number: Int,
     val startMinute: Int,
     val endMinute: Int,
@@ -364,7 +364,7 @@ data class TimeSlot(
 }
 
 /** 作息表 */
-data class TimeTable(
+data class PeriodSchedule(
     val id: Long,
     val name: String,
     val isBase: Boolean,

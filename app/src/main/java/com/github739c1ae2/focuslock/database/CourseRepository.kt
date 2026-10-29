@@ -26,8 +26,8 @@ class CourseRepository @Inject constructor(
     fun observeCourseTables(courseTableId: Long = COURSE_TABLE_ID): Flow<CourseTableEntity> =
         courseDao.observeCourseTable(courseTableId).filterNotNull()
 
-    fun observeTimeTableEntities(courseTableId: Long = COURSE_TABLE_ID): Flow<List<CourseTimeTableEntity>> =
-        courseDao.observeTimeTables(courseTableId)
+    fun observePeriodScheduleEntities(courseTableId: Long = COURSE_TABLE_ID): Flow<List<CoursePeriodScheduleEntity>> =
+        courseDao.observePeriodSchedules(courseTableId)
 
     fun observeCourseEntityList(courseTableId: Long = COURSE_TABLE_ID): Flow<List<CourseListItem>> =
         courseDao.observeCourseList(courseTableId)
@@ -40,39 +40,39 @@ class CourseRepository @Inject constructor(
     suspend fun getActiveCourses(courseTableId: Long = COURSE_TABLE_ID): List<Course> =
         courseDao.getActiveCoursesWithSessions(courseTableId).map { it.toCourse() }
 
-    suspend fun getBaseTimeTable(courseTableId: Long = COURSE_TABLE_ID): TimeTable =
-        requireNotNull(courseDao.getBaseTimeTable(courseTableId)).toTimeTable()
+    suspend fun getBasePeriodSchedule(courseTableId: Long = COURSE_TABLE_ID): PeriodSchedule =
+        requireNotNull(courseDao.getBasePeriodSchedule(courseTableId)).toPeriodSchedule()
 
-    suspend fun getTimeTable(id: Long): TimeTable? {
-        return courseDao.getTimeTable(id)?.toTimeTable()
+    suspend fun getPeriodSchedule(id: Long): PeriodSchedule? {
+        return courseDao.getPeriodSchedule(id)?.toPeriodSchedule()
     }
 
-    suspend fun createTimeTable(name: String, startEpochDay: Long, endEpochDay: Long, courseTableId: Long = COURSE_TABLE_ID): Long = database.withWriteTransaction {
-        val newTimeTable = getBaseTimeTable().copy(
+    suspend fun createPeriodSchedule(name: String, startEpochDay: Long, endEpochDay: Long, courseTableId: Long = COURSE_TABLE_ID): Long = database.withWriteTransaction {
+        val newPeriodSchedule = getBasePeriodSchedule().copy(
             id = 0L,
             name = name,
             isBase = false,
             startEpochDay = startEpochDay,
             endEpochDay = endEpochDay
         )
-        upsertTimeTable(newTimeTable, courseTableId)
+        upsertPeriodSchedule(newPeriodSchedule, courseTableId)
     }
 
-    suspend fun upsertTimeTable(timeTable: TimeTable, courseTableId: Long = COURSE_TABLE_ID): Long = database.withWriteTransaction {
-        val timeTableEntity = CourseTimeTableEntity(
-            id = timeTable.id,
+    suspend fun upsertPeriodSchedule(periodSchedule: PeriodSchedule, courseTableId: Long = COURSE_TABLE_ID): Long = database.withWriteTransaction {
+        val periodScheduleEntity = CoursePeriodScheduleEntity(
+            id = periodSchedule.id,
             courseTableId = courseTableId,
-            name = timeTable.name,
-            isBase = timeTable.isBase,
-            startEpochDay = timeTable.startEpochDay,
-            endEpochDay = timeTable.endEpochDay
+            name = periodSchedule.name,
+            isBase = periodSchedule.isBase,
+            startEpochDay = periodSchedule.startEpochDay,
+            endEpochDay = periodSchedule.endEpochDay
         )
-        val timeTableId = courseDao.upsertTimeTable(timeTableEntity)
-            .let { if (it == -1L) timeTableEntity.id else it }
-        val slots = timeTable.slots.map { slot ->
+        val periodScheduleId = courseDao.upsertPeriodSchedule(periodScheduleEntity)
+            .let { if (it == -1L) periodScheduleEntity.id else it }
+        val slots = periodSchedule.slots.map { slot ->
             CourseTimeSlotEntity(
                 courseTableId = courseTableId,
-                timeTableId = timeTable.id,
+                periodScheduleId = periodSchedule.id,
                 number = slot.number,
                 startMinute = slot.startMinute,
                 endMinute = slot.endMinute,
@@ -80,16 +80,16 @@ class CourseRepository @Inject constructor(
             )
         }
         courseDao.replaceTimeSlots(
-            timeTableId = timeTableId,
+            periodScheduleId = periodScheduleId,
             slots = slots
         )
-        timeTableId
+        periodScheduleId
     }
 
-    suspend fun deleteTimeTable(id: Long) {
-        val timeTable = courseDao.getTimeTable(id) ?: return
-        require(!timeTable.isBase) { "Cannot delete the base time table" }
-        courseDao.deleteTimeTable(id)
+    suspend fun deletePeriodSchedule(id: Long) {
+        val periodSchedule = courseDao.getPeriodSchedule(id) ?: return
+        require(!periodSchedule.isBase) { "Cannot delete the base period schedule" }
+        courseDao.deletePeriodSchedule(id)
     }
 
     suspend fun getEffectiveTimeSlots(
@@ -151,19 +151,19 @@ class CourseRepository @Inject constructor(
 
     suspend fun deleteCourses(courseTableId: Long) = courseDao.deleteCourses(courseTableId)
 
-    suspend fun deleteNonBaseTimeTables(courseTableId: Long) = courseDao.deleteNonBaseTimeTables(courseTableId)
+    suspend fun deleteNonBasePeriodSchedules(courseTableId: Long) = courseDao.deleteNonBasePeriodSchedules(courseTableId)
 
     suspend fun updateCourseActiveStatus(courseId: Long, isActive: Boolean) =
         courseDao.updateCourseActiveStatus(courseId, isActive)
 
 
-    private suspend fun CourseTimeTableEntity.toTimeTable(): TimeTable = TimeTable(
+    private suspend fun CoursePeriodScheduleEntity.toPeriodSchedule(): PeriodSchedule = PeriodSchedule(
         id = id,
         name = name,
         isBase = isBase,
         startEpochDay = startEpochDay,
         endEpochDay = endEpochDay,
-        slots = courseDao.getSlotsByTimeTable(id).map { slot ->
+        slots = courseDao.getSlotsByPeriodSchedule(id).map { slot ->
             TimeSlot(
                 number = slot.number,
                 startMinute = slot.startMinute,

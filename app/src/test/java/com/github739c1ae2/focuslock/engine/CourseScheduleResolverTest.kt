@@ -430,7 +430,7 @@ class CourseScheduleResolverTest {
 
     /** 构造作息节次；起止时间均为从本地当天零点起算的分钟数。 */
     private fun slot(number: Int, startMinute: Int, endMinute: Int) = CourseTimeSlotEntity(
-        timeTableId = 1, number = number, startMinute = startMinute, endMinute = endMinute
+        periodScheduleId = 1, number = number, startMinute = startMinute, endMinute = endMinute
     )
 
     /** 按用例当前的系统时区，将本地日期和时刻转成绝对毫秒时间戳。 */
