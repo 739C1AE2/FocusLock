@@ -187,33 +187,64 @@ class CourseScheduleResolverTest {
         assertEquals(at(8), CourseScheduleResolver.findNextStart(data, at(7)))
     }
 
-    /** 跨节课程按节次编号查找首尾作息，整个区间包含中间的课间休息。 */
+    /** 跨节课程逐节锁定，课间释放；作息列表不要求按节次排序。 */
     @Test
-    fun sectionTime_usesSectionNumbersAndCoversBreaksBetweenSections() {
+    fun sectionTime_unlocksBetweenSectionsAndResumesAtNextSection() {
         val data = schedule(
-            courses = listOf(course(sessions = listOf(session(time = CourseSessionTime.Sections(1, 3))))),
-            slots = listOf(slot(3, 10 * 60, 11 * 60), slot(1, 8 * 60, 8 * 60 + 45))
+            courses = listOf(course(sessions = listOf(session(time = CourseSessionTime.Sections(1, 2))))),
+            slots = listOf(slot(2, 535, 580), slot(1, 480, 525))
         )
 
-        // 作息列表可以无序；中间节次缺失也不拆分整个课程时段。
-        assertEquals(occurrence(end = at(11)), CourseScheduleResolver.findActive(data, at(9)))
-        assertEquals(at(8), CourseScheduleResolver.findNextStart(data, at(7)))
+        val first = occurrence(end = at(8, 45))
+        val second = occurrence(start = at(8, 55), end = at(9, 40))
+        assertNull(CourseScheduleResolver.findActive(data, at(8) - 1))
+        assertEquals(first, CourseScheduleResolver.findActive(data, at(8)))
+        assertEquals(first, CourseScheduleResolver.findActive(data, at(8, 45) - 1))
+        assertNull(CourseScheduleResolver.findActive(data, at(8, 45)))
+        assertNull(CourseScheduleResolver.findActive(data, at(8, 50)))
+        assertNull(CourseScheduleResolver.findActive(data, at(8, 55) - 1))
+        assertEquals(second, CourseScheduleResolver.findActive(data, at(8, 55)))
+        assertEquals(second, CourseScheduleResolver.findActive(data, at(9, 40) - 1))
+        assertNull(CourseScheduleResolver.findActive(data, at(9, 40)))
     }
 
-    /** 起始节次缺失时无法确定开课时间，应跳过该时段。 */
+    /** 唤醒时间包括同一课程的后续节次，上课中和课间都能找到下一节。 */
     @Test
-    fun sectionTime_missingStartSectionSkipsSession() {
+    fun sectionTime_nextStartIncludesLaterSectionsOfSameSession() {
+        val data = schedule(
+            courses = listOf(course(sessions = listOf(session(time = CourseSessionTime.Sections(1, 3))))),
+            slots = listOf(slot(3, 600, 645), slot(1, 480, 525), slot(2, 535, 580))
+        )
+
+        assertEquals(at(8), CourseScheduleResolver.findNextStart(data, at(8) - 1))
+        for (now in listOf(at(8), at(8, 30), at(8, 45), at(8, 50), at(8, 55) - 1)) {
+            assertEquals(at(8, 55), CourseScheduleResolver.findNextStart(data, now))
+        }
+        assertEquals(at(10), CourseScheduleResolver.findNextStart(data, at(8, 55)))
+        assertEquals(at(10), CourseScheduleResolver.findNextStart(data, at(9, 40)))
+        assertNull(CourseScheduleResolver.findNextStart(data, at(10)))
+        assertNull(CourseScheduleResolver.findNextStart(data, at(10, 45)))
+    }
+
+    /** 缺少起始节次不影响范围内其他已知节次，未知时间不会补成锁定区间。 */
+    @Test
+    fun sectionTime_missingStartSectionKeepsKnownSections() {
         val data = schedule(
             courses = listOf(course(sessions = listOf(session(time = CourseSessionTime.Sections(1, 2))))),
             slots = listOf(slot(2, 9 * 60, 10 * 60))
         )
 
-        assertNoOccurrence(data, at(7))
+        assertNull(CourseScheduleResolver.findActive(data, at(8, 30)))
+        assertEquals(at(9), CourseScheduleResolver.findNextStart(data, at(7)))
+        assertEquals(
+            occurrence(start = at(9), end = at(10)),
+            CourseScheduleResolver.findActive(data, at(9, 30))
+        )
     }
 
-    /** 记录当前回退规则：结束节次缺失时，使用起始节次的结束时间。 */
+    /** 结束节次缺失时仍使用其他已知节次，不延长到未知的下课时间。 */
     @Test
-    fun sectionTime_missingEndSectionFallsBackToStartSection() {
+    fun sectionTime_missingEndSectionKeepsKnownSections() {
         val data = schedule(
             courses = listOf(course(sessions = listOf(session(time = CourseSessionTime.Sections(1, 2))))),
             slots = listOf(slot(1, 8 * 60, 9 * 60))
@@ -224,23 +255,122 @@ class CourseScheduleResolverTest {
         assertEquals(at(8), CourseScheduleResolver.findNextStart(data, at(7)))
     }
 
-    /** 排除节次倒置，以及映射后起止时间相等或倒置的作息组合。 */
+    /** 缺少中间节次时保留两端的上课时间，中间未知区间保持释放。 */
     @Test
-    fun sectionTime_rejectsReversedSectionsAndNonIncreasingTimeWindows() {
-        val cases = listOf(
-            // 起始节次大于结束节次。
-            CourseSessionTime.Sections(2, 1) to listOf(slot(1, 480, 525), slot(2, 540, 585)),
-            // 节次顺序正确，但开始时间等于结束时间。
-            CourseSessionTime.Sections(1, 2) to listOf(slot(1, 540, 585), slot(2, 480, 540)),
-            // 节次顺序正确，但开始时间晚于结束时间。
-            CourseSessionTime.Sections(1, 2) to listOf(slot(1, 540, 585), slot(2, 480, 525))
+    fun sectionTime_missingMiddleSectionDoesNotBridgeGap() {
+        val data = schedule(
+            courses = listOf(course(sessions = listOf(session(time = CourseSessionTime.Sections(1, 3))))),
+            slots = listOf(slot(3, 600, 645), slot(1, 480, 525))
         )
-        for ((time, slots) in cases) {
-            assertNoOccurrence(
-                schedule(courses = listOf(course(sessions = listOf(session(time = time)))), slots = slots),
-                at(7), "$time with $slots"
+
+        assertEquals(occurrence(end = at(8, 45)), CourseScheduleResolver.findActive(data, at(8, 30)))
+        assertNull(CourseScheduleResolver.findActive(data, at(9)))
+        assertEquals(at(10), CourseScheduleResolver.findNextStart(data, at(9)))
+        assertEquals(
+            occurrence(start = at(10), end = at(10, 45)),
+            CourseScheduleResolver.findActive(data, at(10, 30))
+        )
+    }
+
+    /** 相邻或重叠的节次没有实际课间，合并后不会在中途重置锁定时段。 */
+    @Test
+    fun sectionTime_mergesTouchingAndOverlappingSections() {
+        val cases = listOf(
+            listOf(slot(2, 525, 570), slot(1, 480, 525)),
+            listOf(slot(2, 520, 570), slot(1, 480, 525)),
+            listOf(slot(3, 550, 570), slot(2, 510, 520), slot(1, 480, 560))
+        )
+        for (slots in cases) {
+            val data = schedule(
+                courses = listOf(course(sessions = listOf(session(time = CourseSessionTime.Sections(1, 3))))),
+                slots = slots
             )
+            val expected = occurrence(end = at(9, 30))
+            assertEquals(expected, CourseScheduleResolver.findActive(data, at(8)))
+            assertEquals(expected, CourseScheduleResolver.findActive(data, at(8, 45)))
+            assertEquals(expected, CourseScheduleResolver.findActive(data, at(9, 30) - 1))
+            assertNull(CourseScheduleResolver.findActive(data, at(9, 30)))
+            assertEquals(at(8), CourseScheduleResolver.findNextStart(data, at(7)))
+            assertNull(CourseScheduleResolver.findNextStart(data, at(8)))
         }
+    }
+
+    /** 课程只使用所选节次，范围外的作息即使紧邻也不能扩大锁定时间。 */
+    @Test
+    fun sectionTime_excludesSlotsOutsideSelectedSections() {
+        val data = schedule(
+            courses = listOf(course(sessions = listOf(session(time = CourseSessionTime.Sections(2, 3))))),
+            slots = listOf(slot(1, 480, 540), slot(2, 540, 585), slot(3, 595, 640), slot(4, 640, 685))
+        )
+
+        assertNull(CourseScheduleResolver.findActive(data, at(8, 30)))
+        assertEquals(at(9), CourseScheduleResolver.findNextStart(data, at(8)))
+        assertEquals(occurrence(start = at(9), end = at(9, 45)), CourseScheduleResolver.findActive(data, at(9)))
+        assertNull(CourseScheduleResolver.findActive(data, at(9, 50)))
+        assertEquals(at(9, 55), CourseScheduleResolver.findNextStart(data, at(9, 50)))
+        assertNull(CourseScheduleResolver.findActive(data, at(10, 40)))
+        assertNull(CourseScheduleResolver.findNextStart(data, at(10, 40)))
+    }
+
+    /** 节次范围倒置时不能产生任何锁定或唤醒时间。 */
+    @Test
+    fun sectionTime_rejectsReversedSections() {
+        assertNoOccurrence(
+            schedule(
+                courses = listOf(course(sessions = listOf(session(time = CourseSessionTime.Sections(2, 1))))),
+                slots = listOf(slot(1, 480, 525), slot(2, 540, 585))
+            ),
+            at(7)
+        )
+    }
+
+    /** 无效作息不应扩大锁定区间或影响同一课程内其他有效节次。 */
+    @Test
+    fun sectionTime_ignoresInvalidSlotTimes() {
+        val invalidRanges = listOf(-1 to 525, 480 to 1440, 480 to 480, 525 to 480, 1440 to 1500)
+        for ((start, end) in invalidRanges) {
+            val data = schedule(
+                courses = listOf(course(sessions = listOf(session(time = CourseSessionTime.Sections(1, 2))))),
+                slots = listOf(slot(1, start, end), slot(2, 540, 585))
+            )
+            assertNull(CourseScheduleResolver.findActive(data, at(8, 30)))
+            assertEquals(at(9), CourseScheduleResolver.findNextStart(data, at(7)))
+            assertEquals(
+                occurrence(start = at(9), end = at(9, 45)),
+                CourseScheduleResolver.findActive(data, at(9, 30))
+            )
+            assertNoOccurrence(data.copy(effectiveTimeSlots = listOf(slot(1, start, end))), at(7))
+        }
+    }
+
+    /** 自定义时间没有课间信息，即使跨过作息中的休息时间也保持连续锁定。 */
+    @Test
+    fun customTime_remainsContinuousAcrossPeriodScheduleBreaks() {
+        val data = schedule(
+            courses = listOf(course(sessions = listOf(session(time = CourseSessionTime.Custom(480, 580))))),
+            slots = listOf(slot(1, 480, 525), slot(2, 535, 580))
+        )
+
+        assertEquals(occurrence(end = at(9, 40)), CourseScheduleResolver.findActive(data, at(8, 50)))
+        assertNull(CourseScheduleResolver.findNextStart(data, at(8, 50)))
+    }
+
+    /** 一个课程休息时，仍可命中另一门课，不会强制把全局状态设为空闲。 */
+    @Test
+    fun sectionTime_breakDoesNotHideAnotherActiveCourse() {
+        val data = schedule(
+            courses = listOf(
+                course(sessions = listOf(session(time = CourseSessionTime.Sections(1, 2)))),
+                course(id = 33, profileId = 44, sessions = listOf(session(time = CourseSessionTime.Custom(525, 535))))
+            ),
+            slots = listOf(slot(1, 480, 525), slot(2, 535, 580))
+        )
+
+        assertEquals(
+            occurrence(start = at(8, 45), end = at(8, 55)).copy(courseId = 33, profileId = 44),
+            CourseScheduleResolver.findActive(data, at(8, 50))
+        )
+        assertEquals(at(8, 55), CourseScheduleResolver.findNextStart(data, at(8, 50)))
     }
 
     /** 自定义时间必须位于当天允许的分钟范围内，且结束时间严格晚于开始时间。 */

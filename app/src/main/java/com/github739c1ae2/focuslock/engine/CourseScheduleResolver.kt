@@ -60,8 +60,8 @@ object CourseScheduleResolver {
 
                 if (!isWeekActive(session, week)) continue
 
-                val window = occurrenceWindow(today, session, data, zone) ?: continue
-                if (nowMillis < window.first || nowMillis >= window.second) continue
+                val window = occurrenceWindows(today, session, data, zone)
+                    .firstOrNull { nowMillis >= it.first && nowMillis < it.second } ?: continue
 
                 return CourseOccurrence(
                     courseId = course.id,
@@ -107,9 +107,10 @@ object CourseScheduleResolver {
                     for (session in courseWithSessions.sessions) {
                         if (session.dayOfWeek != dow) continue
                         if (!isWeekActive(session, week)) continue
-                        val window = occurrenceWindow(date, session, data, zone) ?: continue
-                        if (window.first > nowMillis && (best == null || window.first < best)) {
-                            best = window.first
+                        for (window in occurrenceWindows(date, session, data, zone)) {
+                            if (window.first > nowMillis && (best == null || window.first < best)) {
+                                best = window.first
+                            }
                         }
                     }
                 }
@@ -155,50 +156,53 @@ object CourseScheduleResolver {
 
 
     /**
-     * 计算某次课程在当天的起止分钟数。
+     * 计算某次课程当天的锁定区间，单位为分钟。
      *
      * - 自定义时间时段：直接取自定义起止分钟；
-     * - 跟随作息时段：用当天生效的节次，取起始节次的开始时间、结束节次的结束时间。
+     * - 跟随作息时段：仅锁定节次范围内实际存在且有效的上课时间，保留课间空隙；
+     * - 相邻或重叠的上课时间合并，避免没有课间时切换锁定时段。
      *
-     * @return (startMinute, endMinute)；时间缺失或无效时返回 null
+     * @return 按开始时间排序的 (startMinute, endMinute) 列表；无有效时间时返回空列表
      */
-    private fun resolveMinuteRange(
+    private fun resolveMinuteRanges(
         sessionTime: CourseSessionTime,
         data: CourseScheduleData
-    ): Pair<Int, Int>? {
-        if (!sessionTime.isValid()) return null
-        when (sessionTime) {
-            is CourseSessionTime.Custom -> {
-                val start = sessionTime.startMinute
-                val end = sessionTime.endMinute
-                return start to end
-            }
+    ): List<Pair<Int, Int>> {
+        if (!sessionTime.isValid()) return emptyList()
+        if (sessionTime is CourseSessionTime.Custom) {
+            return listOf(sessionTime.startMinute to sessionTime.endMinute)
+        }
 
-            is CourseSessionTime.Sections -> {
-                val slots = data.effectiveTimeSlots.associateBy { it.number }
-                val startSection = sessionTime.startSection
-                val endSection = sessionTime.endSection
-                val start = slots[startSection] ?: return null
-                val end = slots[endSection] ?: start
-                if (start.startMinute >= end.endMinute) return null
-                return start.startMinute to end.endMinute
+        sessionTime as CourseSessionTime.Sections
+        val ranges = data.effectiveTimeSlots
+            .filter { it.number in sessionTime.startSection..sessionTime.endSection }
+            .filter { CourseSessionTime.Custom(it.startMinute, it.endMinute).isValid() }
+            .map { it.startMinute to it.endMinute }
+            .sortedBy { it.first }
+
+        val merged = mutableListOf<Pair<Int, Int>>()
+        for (range in ranges) {
+            val previous = merged.lastOrNull()
+            if (previous != null && range.first <= previous.second) {
+                merged[merged.lastIndex] = previous.first to maxOf(previous.second, range.second)
+            } else {
+                merged += range
             }
         }
+        return merged
     }
 
     /**
-     * 把某次课程在 [date] 的起止分钟换算成绝对毫秒时间戳。
+     * 把某次课程在 [date] 的各个锁定区间换算成绝对毫秒时间戳。
      *
-     * @return (startMillis, endMillis)；时间不完整时返回 null
+     * @return (startMillis, endMillis) 列表；无有效时间时返回空列表
      */
-    private fun occurrenceWindow(
+    private fun occurrenceWindows(
         date: LocalDate,
         session: CourseSession,
         data: CourseScheduleData,
         zone: ZoneId
-    ): Pair<Long, Long>? {
-        val (startMinute, endMinute) = resolveMinuteRange(session.time, data) ?: return null
-
+    ): List<Pair<Long, Long>> = resolveMinuteRanges(session.time, data).map { (startMinute, endMinute) ->
         val start = date.atTime(startMinute / 60, startMinute % 60)
             .atZone(zone)
             .toInstant()
@@ -207,6 +211,6 @@ object CourseScheduleResolver {
             .atZone(zone)
             .toInstant()
             .toEpochMilli()
-        return start to end
+        start to end
     }
 }
