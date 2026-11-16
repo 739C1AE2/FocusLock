@@ -9,8 +9,6 @@ import androidx.room3.PrimaryKey
 import com.github739c1ae2.focuslock.R
 import com.github739c1ae2.focuslock.adapter.ConfigValue
 import java.time.DayOfWeek
-import java.time.Instant
-import java.time.ZoneId
 
 const val GLOBAL_PROFILE_ID = 1L
 
@@ -46,38 +44,6 @@ data class ScheduleEntity(
     @ColumnInfo(defaultValue = "0")
     val sortOrder: Int = 0
 ) {
-    fun getStartAndEndTimeMillis(nowMillis: Long): Pair<Long, Long> {
-        val zoneId = ZoneId.systemDefault()
-        val now = Instant.ofEpochMilli(nowMillis).atZone(zoneId)
-        val currentMinute = now.hour * 60 + now.minute
-
-        var startDate = now.toLocalDate()
-        var endDate = now.toLocalDate()
-
-        if (startMinute > endMinute) {
-            // 这是一个跨天任务
-            if (currentMinute >= startMinute) {
-                // 当前时间大于开始时间，说明现在是前一天
-                // 那么它的结束时间应该在第二天
-                endDate = endDate.plusDays(1)
-            } else {
-                // 如果 currentMinute < endMinute，说明现在是第二天了
-                // 那么它的开始时间应该在前一天
-                startDate = startDate.minusDays(1)
-            }
-        }
-
-        val startTime = startDate.atTime(startMinute / 60, startMinute % 60)
-            .atZone(zoneId)
-            .toInstant()
-            .toEpochMilli()
-        val endTime = endDate.atTime(endMinute / 60, endMinute % 60)
-            .atZone(zoneId)
-            .toInstant()
-            .toEpochMilli()
-        return Pair(startTime, endTime)
-    }
-
     fun toSchedule(): Schedule {
         return Schedule(
             id = this.id,

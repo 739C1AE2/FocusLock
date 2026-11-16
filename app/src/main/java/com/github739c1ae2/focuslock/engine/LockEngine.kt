@@ -4,6 +4,7 @@ import android.accessibilityservice.AccessibilityService
 import android.content.ComponentName
 import android.content.pm.PackageManager
 import android.os.Build
+import android.os.SystemClock
 import android.provider.Settings
 import android.util.Log
 import android.view.WindowManager
@@ -15,7 +16,6 @@ import com.github739c1ae2.focuslock.adapter.AdapterLockState
 import com.github739c1ae2.focuslock.adapter.AppAdapter
 import com.github739c1ae2.focuslock.adapter.StaticAdapter
 import com.github739c1ae2.focuslock.database.ActiveLockSession
-import com.github739c1ae2.focuslock.database.AppDatabase
 import com.github739c1ae2.focuslock.database.AppRuleMode
 import com.github739c1ae2.focuslock.database.LockRepository
 import com.github739c1ae2.focuslock.database.LockSessionUseCase
@@ -32,7 +32,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -41,17 +40,14 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
 
 class LockEngine @AssistedInject constructor(
-    private val database: AppDatabase,
     private val useCase: LockSessionUseCase,
     private val repository: LockRepository,
     settingsManager: AppSettingsManager,
@@ -78,9 +74,10 @@ class LockEngine @AssistedInject constructor(
     }
 
     private val exceptionHandler = CoroutineExceptionHandler { _, throwable ->
-        onError(throwable)
+        if (!destroyed) onError(throwable)
     }
 
+    /** 当前任务及其执行状态，业务处理和界面观察共用此状态。 */
     val engineState: StateFlow<EngineState>
         field = MutableStateFlow<EngineState>(EngineState.Idle)
 
@@ -90,7 +87,11 @@ class LockEngine @AssistedInject constructor(
     private val eventChannel = Channel<EngineEvent>(Channel.UNLIMITED)
 
     private var countdownJob: Job? = null
-    private var timeTriggerJob: Job? = null
+    private var countdownGeneration = 0L
+
+    private val sessionScheduler = SessionScheduler(useCase, service, engineScope, dispatch = {
+        eventChannel.trySend(it)
+    })
 
     @Volatile
     private var destroyed = false
@@ -144,9 +145,11 @@ class LockEngine @AssistedInject constructor(
                 }
                 val deduped = mutableListOf<EngineEvent>()
                 val seenEvents = mutableSetOf<EngineEvent>()
+                // 合并重复的重算通知，避免同一批事件反复读库；操作、窗口和计时事件不能丢弃。
+                // 从尾部去重可保留最后一次通知的位置，避免改变它与其他事件的先后关系。
                 for (event in batch.reversed()) {
                     when (event) {
-                        EngineEvent.ResolveContent, EngineEvent.DatabaseChanged -> {
+                        EngineEvent.ResolveContent, EngineEvent.DatabaseChanged, EngineEvent.TimeChanged -> {
                             if (seenEvents.add(event)) {
                                 deduped.add(event)
                             }
@@ -161,24 +164,6 @@ class LockEngine @AssistedInject constructor(
                     processEvent(event)
                 }
             }
-        }
-
-        engineScope.launch {
-            database.invalidationTracker
-                .createFlow(
-                    "schedules",
-                    "quick_lock",
-                    "course_tables",
-                    "course_period_schedules",
-                    "course_time_slots",
-                    "courses",
-                    "course_sessions",
-                    emitInitialState = true
-                )
-                .collect {
-                    Log.d(TAG, "数据库发生变化，发送重估事件")
-                    eventChannel.send(EngineEvent.DatabaseChanged)
-                }
         }
     }
 
@@ -213,14 +198,15 @@ class LockEngine @AssistedInject constructor(
         Log.d(TAG, "销毁 LockEngine")
         destroyed = true
         _runningStateFlow.value = null
+        cancelCountdown()
+        throttler.cancel()
+        sessionScheduler.close()
+        engineScope.cancel()
         eventChannel.close()
         overlayManager.destroy()
-        countdownJob?.cancel()
-        throttler.cancel()
-        timeTriggerJob?.cancel()
-        engineScope.cancel()
     }
 
+    /** 处理一个引擎事件，更新任务、前台应用信息或计时状态。 */
     private suspend fun processEvent(event: EngineEvent) {
         when (event) {
             is EngineEvent.WindowStateChanged -> {
@@ -228,41 +214,29 @@ class LockEngine @AssistedInject constructor(
                     activityCache.put(event.packageName, event.className)
                 }
             }
-
-            is EngineEvent.ResolveContent -> {
-                resolveCurrentContent()
-            }
-
-            is EngineEvent.DatabaseChanged -> {
-                evaluateCurrentState(forceReloadSession = true)
-            }
-
+            EngineEvent.ResolveContent -> evaluateCurrentState()
+            EngineEvent.DatabaseChanged -> evaluateCurrentState(forceRefresh = true, reloadAdapter = true)
+            EngineEvent.TimeChanged -> evaluateCurrentState(forceRefresh = true)
+            EngineEvent.WakeupTimeReached -> evaluateCurrentState(forceRefresh = true)
             is EngineEvent.ActionRequested -> {
-                when (event.action) {
-                    is EngineAction.RequestPause -> handlePauseRequest(event.action.duration)
+                // 数据变更事件可能仍在队列中；操作前取得最新的任务归属。
+                evaluateCurrentState(forceRefresh = true)
+                when (val action = event.action) {
+                    is EngineAction.RequestPause -> handlePauseRequest(action.duration)
                     is EngineAction.RequestUnlock -> handleForceUnlock()
                 }
             }
-
-            is EngineEvent.WakeupTimeReached -> {
-                val currentSession = (engineState.value as? EngineState.InSession)?.session
-                if (event.expectedSession == null || event.expectedSession == currentSession) {
-                    evaluateCurrentState()
-                }
-            }
-
             is EngineEvent.WarningTick -> {
                 val state = engineState.value
-                if (state is EngineState.InSession && state.session == event.session && state.sessionState is SessionState.Warning) {
-                    engineState.value =
-                        state.copy(sessionState = SessionState.Warning(event.secondsLeft.seconds))
+                if (state is EngineState.InSession && event.generation == countdownGeneration &&
+                    state.sessionState is SessionState.Warning) {
+                    engineState.value = state.copy(sessionState = SessionState.Warning(event.secondsLeft.seconds))
                 }
             }
-
             is EngineEvent.TimerFinished -> {
                 val state = engineState.value
-                if (state is EngineState.InSession && state.session == event.session) {
-                    // 定时器结束，恢复到 Allowed 状态并重新评估
+                if (state is EngineState.InSession && event.generation == countdownGeneration) {
+                    cancelCountdown()
                     engineState.value = state.copy(sessionState = SessionState.Allowed)
                     evaluateCurrentState()
                 }
@@ -270,111 +244,77 @@ class LockEngine @AssistedInject constructor(
         }
     }
 
+    /** 读取前台应用节点，更新当前适配器的内容状态。 */
     private suspend fun resolveCurrentContent() {
-        if (destroyed) {
+        if (destroyed || engineState.value !is EngineState.InSession) return
+        val node: AccessibilityNodeInfo = service.rootInActiveWindow ?: return
+        val packageName = node.packageName?.toString()?.takeIf { it.isNotEmpty() } ?: return
+        if (packageName != currentApp) {
+            currentApp = packageName
+            updateAdapter()
+        }
+        activeAdapter.onEvent(activityCache[currentApp], node)
+    }
+
+    /**
+     * 根据锁定计划和前台内容更新引擎状态。
+     *
+     * @param forceRefresh 是否重新读取任务并更新唤醒等待。
+     * @param reloadAdapter 任务未变时，是否在刷新计划时重新加载当前应用规则。
+     */
+    private suspend fun evaluateCurrentState(forceRefresh: Boolean = false, reloadAdapter: Boolean = false) {
+        // 内容事件频繁，未到时间边界时沿用当前任务，避免反复读取数据库。
+        if (forceRefresh || sessionScheduler.needsRefresh()) {
+            val previous = (engineState.value as? EngineState.InSession)?.session
+            val next = sessionScheduler.refresh(previous)
+            applySession(next, reloadAdapter)
+        }
+        // 先完成任务和唤醒更新，前台节点暂时不可用时调度也能正常推进。
+        resolveCurrentContent()
+
+        val state = engineState.value as? EngineState.InSession ?: return
+        if (state.sessionState is SessionState.Warning || state.sessionState == SessionState.Paused) {
             return
         }
-//        var focusedPkg: String? = null
-//        var focusedNode: AccessibilityNodeInfo? = null
-
-//        val windows = service.windows
-//        for (window in windows) {
-//            if (window == null) {
-//                continue
-//            }
-//            if (window.type == AccessibilityWindowInfo.TYPE_APPLICATION) {
-//                if (window.isFocused || window.isActive) {
-//                    val root = window.root ?: continue
-//                    val resolvedPkg = root.packageName?.toString() ?: continue
-//                    focusedPkg = resolvedPkg
-//                    focusedNode = root
-//                    break
-//                }
-//            }
-//        }
-        if (engineState.value is EngineState.InSession) {
-            val focusedNode: AccessibilityNodeInfo? = service.rootInActiveWindow
-            val focusedPkg = focusedNode?.packageName?.toString() ?: return
-            if (focusedPkg.isEmpty()) {
-                Log.w(TAG, "无法解析当前应用包名")
-                return
-            }
-            if (focusedPkg != currentApp) {
-                currentApp = focusedPkg
-                Log.d(TAG, "当前应用已变更为: $currentApp")
-                updateAdapter()
-            }
-            activeAdapter.onEvent(activityCache[currentApp], focusedNode)
-        }
-        evaluateCurrentState()
+        engineState.value = state.copy(sessionState =
+            if (activeAdapter.currentLockState == AdapterLockState.BLOCK) SessionState.Locked else SessionState.Allowed)
     }
 
-    private suspend fun evaluateCurrentState(forceReloadSession: Boolean = false) {
-        val state = engineState.value
-        val oldSession = (state as? EngineState.InSession)?.session
-        if (forceReloadSession || oldSession == null || System.currentTimeMillis() >= oldSession.endTimeMillis) {
-            val session = useCase.getActiveSession()
-            if (session == null) {
-                setIdle(forceReloadSession)
-                return
+    /**
+     * 应用活动任务，更新运行状态、适配器和入场警告。
+     *
+     * @param session 新的活动任务；为 null 时转为空闲。
+     * @param reloadAdapter 任务未变时是否重新加载应用规则。
+     */
+    private suspend fun applySession(session: ActiveLockSession?, reloadAdapter: Boolean) {
+        val previous = engineState.value as? EngineState.InSession
+        if (session == null) {
+            if (previous != null) {
+                cancelCountdown()
+                engineState.value = EngineState.Idle
+                currentApp = ""
+                updateAdapterInstance(StaticAdapter.PASSED)
             }
-            if (oldSession != session) {
-                changeSession(session, oldSession)
-                // changeSession 只是更新了适配器对象，适配器还不知道当前界面的内容，
-                // 重新解析当前内容，这会更新适配器解析状态
-                resolveCurrentContent()
-                // 当前状态还没准备完毕，直接 return
-                // resolveCurrentContent 会在完成后重新调用 evaluateCurrentState
-                return
-            }
+            return
+        }
+        if (previous?.session == session) {
+            if (reloadAdapter) updateAdapter()
+            return
         }
 
-        // 前面所有的可能更改 sessionState 的分支都提前 return 了，所以 engineState 还没有改变
-        when (state.sessionState) {
-
-            is SessionState.Allowed, is SessionState.Locked -> {
-                val isLocked = activeAdapter.currentLockState == AdapterLockState.BLOCK
-                if (isLocked) {
-                    engineState.value = state.copy(sessionState = SessionState.Locked)
-                } else {
-                    engineState.value = state.copy(sessionState = SessionState.Allowed)
-                }
-            }
-
-            SessionState.Paused, is SessionState.Warning -> {
-                // 警告状态下不需要做任何处理，等待倒计时结束后，会被设为 Allowed，从而触发状态更新
-                return
-            }
-        }
-    }
-
-    private suspend fun changeSession(
-        session: ActiveLockSession,
-        oldSession: ActiveLockSession?
-    ) {
-        Log.d(TAG, "活动时段已变更为: $session, 之前的时段: $oldSession")
-
-        countdownJob?.cancel()
-        countdownJob = null
-
-        oldSession?.let {
-            useCase.completeSession(it)
-        }
-
+        Log.d(TAG, "活动时段变更: ${previous?.session} -> $session")
+        // 暂停和警告属于当前执行状态，跨任务沿用会让旧任务的计时影响新任务。
+        cancelCountdown()
         engineState.value = EngineState.InSession(session, SessionState.Allowed)
-
-        // 重新设置唤醒时间
-        scheduleWakeupForSession(session)
-        // 将适配器更新为当前时段的
         updateAdapter()
-        // 通知用量统计模块，以重置暂停额度
         unlockUsageManager.onSessionChanged(session)
-
-        if (oldSession == null) {
-            // 之前没有 Session，说明是从空闲状态进入了 Session，需要启动警告倒计时
-            val duration = (session.startTimeMillis + 15000 - System.currentTimeMillis())
-                .coerceIn(3000, 15000)
-            startWarningCountdown(duration.milliseconds, session)
+        // 只有从空闲进入时给予宽限，避免任务交接反复推迟锁定。
+        if (previous == null) {
+            val now = System.currentTimeMillis()
+            // 迟进入仍预留短暂提示，但剩余窗口更短时以任务结束为上限。
+            val warningMillis = minOf((session.startTimeMillis + 15_000 - now).coerceIn(3_000, 15_000),
+                session.endTimeMillis - now)
+            if (warningMillis > 0) startWarningCountdown(warningMillis.milliseconds)
         }
     }
 
@@ -384,7 +324,7 @@ class LockEngine @AssistedInject constructor(
             updateAdapterInstance(StaticAdapter.PASSED)
             return
         }
-        val profile = requireNotNull(repository.getProfile(state.session.profileId))
+        val profile = repository.getProfile(state.session.profileId)
         val rule = profile.rules[currentApp]
         if (rule?.appliedAdapterId != null) {
             val factory = AdapterFactoryRegistry.getFactoryById(rule.appliedAdapterId)
@@ -406,7 +346,6 @@ class LockEngine @AssistedInject constructor(
                 profile.userAppMode == AppRuleMode.BLACKLIST
             }
         }
-        // 无法判断是否为系统应用，为防止发生意外，默认不锁
         updateAdapterInstance(
             if (locked) {
                 StaticAdapter.BLOCKED
@@ -422,137 +361,51 @@ class LockEngine @AssistedInject constructor(
         activeAdapter.onAttach(currentApp)
     }
 
-    private fun startWarningCountdown(duration: Duration, session: ActiveLockSession) {
+    /** 取消当前警告或暂停倒计时，并使其待处理回调失效。 */
+    private fun cancelCountdown() {
+        // 取消协程不能撤回已入队的回调，版本号用于阻止它们修改新的计时状态。
+        ++countdownGeneration
         countdownJob?.cancel()
+        countdownJob = null
+    }
 
-        val state = engineState.value
-        require(state is EngineState.InSession)
-
-        engineState.update {
-            require(it is EngineState.InSession)
-            it.copy(sessionState = SessionState.Warning(duration))
-        }
+    /** 启动警告倒计时，投递剩余秒数，并在结束时投递完成事件。 */
+    private fun startWarningCountdown(duration: Duration) {
+        cancelCountdown()
+        val state = engineState.value as? EngineState.InSession ?: return
+        engineState.value = state.copy(sessionState = SessionState.Warning(duration))
+        val token = countdownGeneration
+        // 警告按经过的时间计时，使用单调时钟以免系统改时延长或缩短倒计时。
+        val end = SystemClock.elapsedRealtime() + duration.inWholeMilliseconds
         countdownJob = engineScope.launch {
-            var secondsLeft = duration.inWholeSeconds
-            val endTimeMillis = System.currentTimeMillis() + secondsLeft * 1000
-            while (isActive && secondsLeft >= 0) {
-                eventChannel.send(EngineEvent.WarningTick(secondsLeft, session))
-                val targetTimeMillis = endTimeMillis - secondsLeft * 1000
-                val delayMillis = targetTimeMillis - System.currentTimeMillis()
-                if (delayMillis > 0) {
-                    delay(delayMillis.milliseconds)
-                }
-                secondsLeft--
+            while (isActive) {
+                val remaining = end - SystemClock.elapsedRealtime()
+                if (remaining <= 0) break
+                eventChannel.send(EngineEvent.WarningTick((remaining + 999) / 1000, token))
+                delay(minOf(remaining, 1_000L).milliseconds)
             }
-
-            if (isActive) {
-                eventChannel.send(EngineEvent.TimerFinished(EngineEvent.TimerType.WARNING, session))
-            }
+            if (isActive) eventChannel.send(EngineEvent.TimerFinished(token))
         }
     }
 
     private fun handlePauseRequest(duration: Duration) {
-        countdownJob?.cancel()
-
-        val state = engineState.value
-        if (state !is EngineState.InSession) {
-            return
-        }
-        val session = state.session
-
-        engineState.update {
-            require(it is EngineState.InSession)
-            it.copy(sessionState = SessionState.Paused)
-        }
+        val state = engineState.value as? EngineState.InSession ?: return
+        if (duration <= Duration.ZERO || state.sessionState == SessionState.Paused) return
+        cancelCountdown()
+        engineState.value = state.copy(sessionState = SessionState.Paused)
+        val token = countdownGeneration
         countdownJob = engineScope.launch {
             delay(duration)
-            if (isActive) {
-                eventChannel.send(EngineEvent.TimerFinished(EngineEvent.TimerType.PAUSE, session))
-            }
+            if (isActive) eventChannel.send(EngineEvent.TimerFinished(token))
         }
     }
 
-    private fun scheduleWakeupForSession(session: ActiveLockSession) {
-        timeTriggerJob?.cancel()
-        timeTriggerJob = null
-
-        val now = System.currentTimeMillis()
-        val endTime = session.endTimeMillis
-
-        val delayMs = endTime - now
-        if (delayMs > 0) {
-            timeTriggerJob = engineScope.launch {
-                delayUntil(endTime, 1.minutes)
-                if (isActive) {
-                    eventChannel.send(EngineEvent.WakeupTimeReached(session))
-                }
-            }
-        }
-    }
-
-    /**
-     * 当前闲置时，向数据库查询最近的下一个任务时间，到点自动唤醒
-     */
-    private suspend fun scheduleNextWakeup() {
-        if (engineState.value !is EngineState.Idle) return
-        timeTriggerJob?.cancel()
-        timeTriggerJob = null
-
-        val now = System.currentTimeMillis()
-        val nextStartTime = useCase.getNextStartTimeMillis(now)
-        if (nextStartTime != null) {
-            val delayMs = nextStartTime - now
-            if (delayMs > 0) {
-                timeTriggerJob = engineScope.launch {
-                    delayUntil(nextStartTime, 5.minutes)
-                    if (isActive) {
-                        eventChannel.send(EngineEvent.WakeupTimeReached(null))
-                    }
-                }
-            }
-        }
-    }
-
-    private suspend fun delayUntil(
-        targetTimestamp: Long,
-        maxSleepMillis: Duration
-    ) {
-        while (currentCoroutineContext().isActive) {
-            val remaining = targetTimestamp - System.currentTimeMillis()
-            if (remaining <= 0) {
-                break
-            }
-            delay(minOf(remaining.milliseconds, maxSleepMillis))
-        }
-    }
-
+    /** 取消当前时刻生效的全部锁定任务，并重新求值。 */
     private suspend fun handleForceUnlock() {
-        countdownJob?.cancel()
-        countdownJob = null
-
-        (engineState.value as? EngineState.InSession)?.session?.let { session ->
-            useCase.cancelSession(session)
-        }
-        setIdle()
-    }
-
-    private suspend fun setIdle(forceScheduleWakeup: Boolean = false) {
-        if (engineState.value is EngineState.Idle) {
-            if (forceScheduleWakeup) {
-                scheduleNextWakeup()
-            }
-            return
-        }
-        (engineState.value as? EngineState.InSession)?.session?.let {
-            useCase.completeSession(it)
-        }
-        countdownJob?.cancel()
-        countdownJob = null
-        timeTriggerJob?.cancel()
-        timeTriggerJob = null
-        engineState.value = EngineState.Idle
-        updateAdapterInstance(StaticAdapter.PASSED)
-        scheduleNextWakeup()
+        if (engineState.value !is EngineState.InSession) return
+        useCase.cancelActiveSessions()
+        // 批量取消完成后再重算，避免逐个取消时切换到其他被遮住的任务。
+        evaluateCurrentState(forceRefresh = true)
     }
 
     private fun isSystemApp(packageName: String): Boolean? {

@@ -80,48 +80,17 @@ interface LockDao {
     fun observeSchedulesByProfileId(profileId: Long): Flow<List<ScheduleEntity>>
 
 
-    @Query("""
-        SELECT * FROM schedules 
-        WHERE isActive = 1 
-        AND (
-            -- 常规不过夜任务 (比如 08:00 到 12:00)
-            (startMinute <= endMinute 
-             AND (daysOfWeek = '' OR daysOfWeek LIKE '%' || :todayStr || '%')
-             AND :currentMinute >= startMinute 
-             AND :currentMinute < endMinute)
-             
-            OR 
-             
-            -- 跨天任务的前一天 (比如 22:00 到 23:59)
-            -- 此时处于配置的第一天
-            (startMinute > endMinute 
-             AND (daysOfWeek = '' OR daysOfWeek LIKE '%' || :todayStr || '%')
-             AND :currentMinute >= startMinute)
-             
-            OR 
-             
-            -- 情况 3：跨天任务的后一天 (比如 00:00 到 06:00)
-            -- 此时已经是第二天了，查昨天有没有配置这个任务
-            (startMinute > endMinute 
-             AND (daysOfWeek = '' OR daysOfWeek LIKE '%' || :yesterdayStr || '%')
-             AND :currentMinute < endMinute)
-        )
-        ORDER BY sortOrder ASC, id ASC
-    """)
-    suspend fun getActiveSchedules(
-        todayStr: String,
-        yesterdayStr: String,
-        currentMinute: Int
-    ): List<ScheduleEntity>
-
-    @Query("SELECT * FROM schedules WHERE isActive = 1")
+    @Query("SELECT * FROM schedules WHERE isActive = 1 ORDER BY sortOrder ASC, id ASC")
     suspend fun getAllActiveSchedulesBasic(): List<ScheduleEntity>
+
+    @Query("SELECT * FROM quick_lock WHERE id = 1")
+    suspend fun getQuickLock(): QuickLockEntity?
+
+    @Query("DELETE FROM quick_lock WHERE id = 1 AND startTimestamp = :startMillis AND endTimestamp = :endMillis")
+    suspend fun deleteQuickLockWindow(startMillis: Long, endMillis: Long)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun startQuickLock(quickLock: QuickLockEntity)
-
-    @Query("DELETE FROM quick_lock WHERE id = 1")
-    suspend fun stopQuickLock()
 
     @Query("""
         SELECT * FROM quick_lock 

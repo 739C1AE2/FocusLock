@@ -3,11 +3,9 @@ package com.github739c1ae2.focuslock.database
 import androidx.room3.withReadTransaction
 import androidx.room3.withWriteTransaction
 import com.github739c1ae2.focuslock.adapter.ConfigValue
+import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlinx.coroutines.flow.Flow
-import java.time.Instant
-import java.time.ZoneId
 
 data class AppRuleConfig(
     val packageName: String,
@@ -142,75 +140,12 @@ class LockRepository @Inject constructor(
         dao.startQuickLock(quickLock)
     }
 
-    suspend fun getActiveQuickLock(currentTimeMillis: Long): QuickLockEntity? =
-        dao.getActiveQuickLock(currentTimeMillis)
-
-    suspend fun stopQuickLock() = dao.stopQuickLock()
-
     fun observeAllScheduleEntitiesWithProfileName(): Flow<List<ScheduleWithProfileName>> {
         return dao.observeAllSchedulesWithProfile()
     }
 
     fun observeScheduleEntitiesForProfile(profileId: Long): Flow<List<ScheduleEntity>> {
         return dao.observeSchedulesByProfileId(profileId)
-    }
-
-    suspend fun getActiveScheduleEntities(
-        todayStr: String,
-        yesterdayStr: String,
-        currentMinute: Int
-    ): List<ScheduleEntity> = dao.getActiveSchedules(todayStr, yesterdayStr, currentMinute)
-
-    suspend fun getNextScheduleStartTimeMillis(nowMillis: Long): Long? {
-        val allActive = dao.getAllActiveSchedulesBasic()
-        if (allActive.isEmpty()) return null
-
-        val zoneId = ZoneId.systemDefault()
-        val now = Instant.ofEpochMilli(nowMillis).atZone(zoneId)
-        val todayDate = now.toLocalDate()
-        val currentMinute = now.hour * 60 + now.minute
-
-        var closestStartMillis: Long? = null
-
-        for (schedule in allActive) {
-            if (schedule.daysOfWeek.isEmpty()) continue
-
-            var daysToAdd: Long? = null
-
-            for (i in 0L..7L) {
-                val targetLocalDate = todayDate.plusDays(i)
-                val checkDayOfWeek = targetLocalDate.dayOfWeek
-
-                if (schedule.daysOfWeek.contains(checkDayOfWeek)) {
-                    if (i == 0L) {
-                        if (currentMinute < schedule.startMinute) {
-                            daysToAdd = 0L
-                            break
-                        }
-                    } else {
-                        daysToAdd = i
-                        break
-                    }
-                }
-            }
-
-            if (daysToAdd != null) {
-                val targetDate = todayDate.plusDays(daysToAdd)
-                val startHour = schedule.startMinute / 60
-                val startMin = schedule.startMinute % 60
-
-                val startMillis = targetDate.atTime(startHour, startMin)
-                    .atZone(zoneId)
-                    .toInstant()
-                    .toEpochMilli()
-
-                if (closestStartMillis == null || startMillis < closestStartMillis) {
-                    closestStartMillis = startMillis
-                }
-            }
-        }
-
-        return closestStartMillis
     }
 
 }

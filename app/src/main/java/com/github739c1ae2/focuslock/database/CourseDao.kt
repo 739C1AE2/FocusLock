@@ -49,6 +49,12 @@ interface CourseDao {
     @Query("SELECT * FROM course_period_schedules WHERE courseTableId = :courseTableId ORDER BY isBase DESC, id ASC")
     fun observePeriodSchedules(courseTableId: Long): Flow<List<CoursePeriodScheduleEntity>>
 
+    @Query("SELECT * FROM course_period_schedules WHERE courseTableId = :courseTableId ORDER BY isBase ASC, startEpochDay DESC, id ASC")
+    suspend fun getPeriodSchedules(courseTableId: Long): List<CoursePeriodScheduleEntity>
+
+    @Query("SELECT * FROM course_time_slots WHERE courseTableId = :courseTableId ORDER BY number ASC")
+    suspend fun getAllTimeSlots(courseTableId: Long): List<CourseTimeSlotEntity>
+
     @Query("SELECT * FROM course_period_schedules WHERE id = :id LIMIT 1")
     suspend fun getPeriodSchedule(id: Long): CoursePeriodScheduleEntity?
 
@@ -108,12 +114,6 @@ interface CourseDao {
     }
 
     @Query(EFFECTIVE_TIME_SLOTS_QUERY)
-    suspend fun getEffectiveTimeSlots(
-        courseTableId: Long,
-        todayEpochDay: Long
-    ): List<CourseTimeSlotEntity>
-
-    @Query(EFFECTIVE_TIME_SLOTS_QUERY)
     fun observeEffectiveTimeSlots(
         courseTableId: Long,
         todayEpochDay: Long
@@ -134,7 +134,7 @@ interface CourseDao {
     fun observeCourseList(courseTableId: Long): Flow<List<CourseListItem>>
 
     @Transaction
-    @Query("SELECT * FROM courses WHERE isActive = 1 AND courseTableId = :courseTableId")
+    @Query("SELECT * FROM courses WHERE isActive = 1 AND courseTableId = :courseTableId ORDER BY id ASC")
     suspend fun getActiveCoursesWithSessions(courseTableId: Long): List<CourseWithSessions>
 
     @Transaction

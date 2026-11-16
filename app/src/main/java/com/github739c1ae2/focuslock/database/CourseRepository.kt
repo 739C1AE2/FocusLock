@@ -47,6 +47,22 @@ class CourseRepository @Inject constructor(
         return courseDao.getPeriodSchedule(id)?.toPeriodSchedule()
     }
 
+    /** 读取指定课程表的全部作息及各作息的节次。 */
+    suspend fun getPeriodSchedules(courseTableId: Long = COURSE_TABLE_ID): List<PeriodSchedule> {
+        // 调度需要按课程发生日选择作息，批量加载可避免为每个未来日期查询数据库。
+        val slots = courseDao.getAllTimeSlots(courseTableId).groupBy { it.periodScheduleId }
+        return courseDao.getPeriodSchedules(courseTableId).map { period ->
+            PeriodSchedule(
+                id = period.id,
+                name = period.name,
+                isBase = period.isBase,
+                startEpochDay = period.startEpochDay,
+                endEpochDay = period.endEpochDay,
+                slots = slots[period.id].orEmpty().map { TimeSlot(it.number, it.startMinute, it.endMinute, it.alias) }
+            )
+        }
+    }
+
     suspend fun createPeriodSchedule(name: String, startEpochDay: Long, endEpochDay: Long, courseTableId: Long = COURSE_TABLE_ID): Long = database.withWriteTransaction {
         val newPeriodSchedule = getBasePeriodSchedule().copy(
             id = 0L,
@@ -92,12 +108,6 @@ class CourseRepository @Inject constructor(
         courseDao.deletePeriodSchedule(id)
     }
 
-    suspend fun getEffectiveTimeSlots(
-        todayEpochDay: Long,
-        courseTableId: Long = COURSE_TABLE_ID
-    ): List<CourseTimeSlotEntity> =
-        courseDao.getEffectiveTimeSlots(courseTableId, todayEpochDay)
-
     fun observeEffectiveTimeSlots(
         todayEpochDay: Long,
         courseTableId: Long = COURSE_TABLE_ID
@@ -111,7 +121,7 @@ class CourseRepository @Inject constructor(
         id = course.id,
         name = course.name,
         profileId = course.profileId,
-        sessions = sessions.map { it.toSession() }
+        sessions = sessions.sortedBy { it.id }.map { it.toSession() }
     )
 
     suspend fun createCourse(name: String, courseTableId: Long = COURSE_TABLE_ID): Long = database.withWriteTransaction {
@@ -123,6 +133,11 @@ class CourseRepository @Inject constructor(
         )
     }
 
+    /**
+     * 新建或更新课程，并整体替换其时段。
+     *
+     * @return 保存后的课程 ID。
+     */
     suspend fun upsertCourse(course: Course, courseTableId: Long = COURSE_TABLE_ID): Long = database.withWriteTransaction {
         val courseId = if (course.id == 0L) {
             courseDao.insertCourse(
@@ -142,8 +157,9 @@ class CourseRepository @Inject constructor(
             )
             course.id
         }
+        // 课程时段是值对象，由存储层重建子表身份，避免要求 UI 保存和回传数据库行 ID。
         val sessions = course.sessions.map { it.toEntity(courseId) }
-        courseDao.replaceCourseSessions(course.id, sessions)
+        courseDao.replaceCourseSessions(courseId, sessions)
         courseId
     }
 
