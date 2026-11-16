@@ -6,9 +6,11 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.minus
+import androidx.compose.foundation.layout.plus
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 
 
 // FIXME: 暂时找不到官方推荐的方法同时实现以下需求，当前方案仅为 workaround：
@@ -118,3 +120,14 @@ fun Modifier.applyImeInsetsAndConsumeScaffoldPadding(
     this
         .windowInsetsPadding(insets.imeInsets)
         .consumeWindowInsets(insets.contentPadding)
+
+/**
+ * 可滚动内容除了安全边距外需要额外添加的内容内边距
+ */
+fun listContentPadding(hasFAB: Boolean = false): PaddingValues {
+    return PaddingValues(16.dp) + if (hasFAB) {
+        PaddingValues(bottom = 88.dp)
+    } else {
+        PaddingValues(0.dp)
+    }
+}

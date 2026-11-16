@@ -2,7 +2,6 @@ package com.github739c1ae2.focuslock.ui.screen.profile
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -39,6 +38,7 @@ import com.github739c1ae2.focuslock.R
 import com.github739c1ae2.focuslock.database.ProfileEntity
 import com.github739c1ae2.focuslock.ui.components.InputDialog
 import com.github739c1ae2.focuslock.ui.components.customCardColors
+import com.github739c1ae2.focuslock.util.listContentPadding
 
 @Composable
 fun ProfileListScreen(
@@ -80,7 +80,7 @@ fun ProfileListScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .consumeWindowInsets(innerPadding),
-            contentPadding = innerPadding + PaddingValues(16.dp),
+            contentPadding = innerPadding + listContentPadding(hasFAB = true),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             if (profiles.isEmpty()) {

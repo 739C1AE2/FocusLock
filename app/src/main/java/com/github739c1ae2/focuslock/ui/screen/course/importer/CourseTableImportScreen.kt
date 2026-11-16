@@ -76,6 +76,7 @@ import com.github739c1ae2.focuslock.ui.components.ProfileDropdown
 import com.github739c1ae2.focuslock.util.applyImeInsetsAndConsumeScaffoldPadding
 import com.github739c1ae2.focuslock.util.calculateImeAwareScaffoldInsets
 import com.github739c1ae2.focuslock.util.epochDayToDateString
+import com.github739c1ae2.focuslock.util.listContentPadding
 import com.github739c1ae2.focuslock.util.minutesToClockString
 
 @Composable
@@ -173,7 +174,7 @@ private fun ParserSelectContent(
             .fillMaxWidth()
             .verticalScroll(rememberScrollState())
             .padding(contentPadding)
-            .padding(16.dp),
+            .padding(listContentPadding()),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         Text(
@@ -215,7 +216,7 @@ private fun ReviewContent(
     LazyColumn(
         modifier = modifier
             .fillMaxWidth(),
-        contentPadding = contentPadding + PaddingValues(16.dp),
+        contentPadding = contentPadding + listContentPadding(),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         item {
@@ -325,7 +326,7 @@ private fun ImportResultContent(
             .fillMaxWidth()
             .verticalScroll(rememberScrollState())
             .padding(contentPadding)
-            .padding(16.dp),
+            .padding(listContentPadding()),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {

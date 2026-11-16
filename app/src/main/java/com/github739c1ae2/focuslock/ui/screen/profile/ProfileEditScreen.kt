@@ -67,6 +67,7 @@ import com.github739c1ae2.focuslock.ui.screen.adapter.AdapterConfigInfo
 import com.github739c1ae2.focuslock.util.AppIconRequest
 import com.github739c1ae2.focuslock.util.applyImeInsetsAndConsumeScaffoldPadding
 import com.github739c1ae2.focuslock.util.calculateImeAwareScaffoldInsets
+import com.github739c1ae2.focuslock.util.listContentPadding
 import com.github739c1ae2.focuslock.util.minutesToClockString
 import kotlinx.serialization.Serializable
 
@@ -254,7 +255,7 @@ private fun ProfileForm(
         modifier = modifier
             .fillMaxSize()
             .applyImeInsetsAndConsumeScaffoldPadding(insets),
-        contentPadding = insets.contentPadding + PaddingValues(16.dp),
+        contentPadding = insets.contentPadding + listContentPadding(),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         item {

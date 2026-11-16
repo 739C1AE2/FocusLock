@@ -5,7 +5,6 @@ import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -34,6 +33,7 @@ import com.github739c1ae2.focuslock.adapter.ConfigValue
 import com.github739c1ae2.focuslock.ui.navigation.scene.AdaptiveDialogScaffold
 import com.github739c1ae2.focuslock.util.applyImeInsetsAndConsumeScaffoldPadding
 import com.github739c1ae2.focuslock.util.calculateImeAwareScaffoldInsets
+import com.github739c1ae2.focuslock.util.listContentPadding
 
 
 @Composable
@@ -71,7 +71,7 @@ fun AdapterConfigScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .applyImeInsetsAndConsumeScaffoldPadding(insets),
-            contentPadding = insets.contentPadding + PaddingValues(16.dp),
+            contentPadding = insets.contentPadding + listContentPadding(),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
 

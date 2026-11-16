@@ -63,6 +63,7 @@ import com.github739c1ae2.focuslock.ui.components.TimeOfDayPickerDialog
 import com.github739c1ae2.focuslock.util.ValidationResult
 import com.github739c1ae2.focuslock.util.applyImeInsetsAndConsumeScaffoldPadding
 import com.github739c1ae2.focuslock.util.calculateImeAwareScaffoldInsets
+import com.github739c1ae2.focuslock.util.listContentPadding
 import com.github739c1ae2.focuslock.util.minutesToClockString
 import java.time.LocalDate
 
@@ -239,7 +240,7 @@ private fun PeriodScheduleForm(
         modifier = modifier
             .fillMaxSize()
             .applyImeInsetsAndConsumeScaffoldPadding(insets),
-        contentPadding = insets.contentPadding + PaddingValues(16.dp),
+        contentPadding = insets.contentPadding + listContentPadding(),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         item {

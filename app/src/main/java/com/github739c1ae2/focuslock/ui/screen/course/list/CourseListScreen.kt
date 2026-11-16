@@ -2,7 +2,6 @@ package com.github739c1ae2.focuslock.ui.screen.course.list
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.consumeWindowInsets
@@ -54,6 +53,7 @@ import com.github739c1ae2.focuslock.database.CourseTableEntity
 import com.github739c1ae2.focuslock.ui.components.InputDialog
 import com.github739c1ae2.focuslock.ui.components.customCardColors
 import com.github739c1ae2.focuslock.util.epochDayToDateString
+import com.github739c1ae2.focuslock.util.listContentPadding
 
 @Composable
 fun CourseListScreen(
@@ -172,7 +172,7 @@ fun CourseListScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .consumeWindowInsets(innerPadding),
-            contentPadding = innerPadding + PaddingValues(16.dp) + PaddingValues(bottom = 88.dp),
+            contentPadding = innerPadding + listContentPadding(hasFAB = true),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             item {

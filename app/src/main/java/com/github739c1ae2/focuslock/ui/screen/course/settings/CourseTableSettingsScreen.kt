@@ -58,6 +58,7 @@ import com.github739c1ae2.focuslock.util.ValidationResult
 import com.github739c1ae2.focuslock.util.applyImeInsetsAndConsumeScaffoldPadding
 import com.github739c1ae2.focuslock.util.calculateImeAwareScaffoldInsets
 import com.github739c1ae2.focuslock.util.epochDayToDateString
+import com.github739c1ae2.focuslock.util.listContentPadding
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.format.TextStyle
@@ -185,7 +186,7 @@ private fun TableSettingsForm(
             .fillMaxSize()
             .applyImeInsetsAndConsumeScaffoldPadding(insets),
         verticalArrangement = Arrangement.spacedBy(16.dp),
-        contentPadding = insets.contentPadding + PaddingValues(16.dp)
+        contentPadding = insets.contentPadding + listContentPadding()
     ) {
         item {
             OutlinedTextField(

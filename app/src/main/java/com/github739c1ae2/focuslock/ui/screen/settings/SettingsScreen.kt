@@ -64,6 +64,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.compose.dropUnlessResumed
 import com.github739c1ae2.focuslock.R
 import com.github739c1ae2.focuslock.ui.navigation.AppRoute
+import com.github739c1ae2.focuslock.util.listContentPadding
 import kotlinx.coroutines.launch
 
 @Composable
@@ -202,7 +203,7 @@ private fun SettingsList(
 ) {
     LazyColumn(
         modifier = modifier,
-        contentPadding = contentPadding + PaddingValues(16.dp),
+        contentPadding = contentPadding + listContentPadding(),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         item {

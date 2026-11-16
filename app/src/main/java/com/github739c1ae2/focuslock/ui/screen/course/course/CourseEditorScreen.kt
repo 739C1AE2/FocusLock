@@ -65,6 +65,7 @@ import com.github739c1ae2.focuslock.util.ValidationResult
 import com.github739c1ae2.focuslock.util.WeeksSummary
 import com.github739c1ae2.focuslock.util.applyImeInsetsAndConsumeScaffoldPadding
 import com.github739c1ae2.focuslock.util.calculateImeAwareScaffoldInsets
+import com.github739c1ae2.focuslock.util.listContentPadding
 import com.github739c1ae2.focuslock.util.minutesToClockString
 import java.time.DayOfWeek
 import java.time.format.TextStyle
@@ -253,7 +254,7 @@ private fun CourseForm(
             .applyImeInsetsAndConsumeScaffoldPadding(insets)
             .verticalScroll(rememberScrollState())
             .padding(insets.contentPadding)
-            .padding(16.dp),
+            .padding(listContentPadding()),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         OutlinedTextField(

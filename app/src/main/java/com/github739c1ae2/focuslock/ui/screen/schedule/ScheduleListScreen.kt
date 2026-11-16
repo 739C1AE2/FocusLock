@@ -3,7 +3,6 @@ package com.github739c1ae2.focuslock.ui.screen.schedule
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -45,6 +44,7 @@ import com.github739c1ae2.focuslock.database.ScheduleWithProfileName
 import com.github739c1ae2.focuslock.database.WEEKDAY_SET
 import com.github739c1ae2.focuslock.ui.components.InputDialog
 import com.github739c1ae2.focuslock.ui.components.customCardColors
+import com.github739c1ae2.focuslock.util.listContentPadding
 import com.github739c1ae2.focuslock.util.minutesToClockString
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
@@ -107,7 +107,7 @@ fun ScheduleListScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .consumeWindowInsets(innerPadding),
-            contentPadding = innerPadding + PaddingValues(16.dp),
+            contentPadding = innerPadding + listContentPadding(hasFAB = true),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             item {
