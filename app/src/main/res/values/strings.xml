@@ -266,4 +266,5 @@
     <string name="session_unknown_weeks_warning">引用了当前学期范围以外的周次：%1$s</string>
     <string name="period_schedule_date_overlap_error">日期范围与其他临时作息重叠</string>
     <string name="unknown">未知</string>
+    <string name="course_table_import_warning">导入会替换现有课程、学期设置和作息。</string>
 </resources>
