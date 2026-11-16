@@ -267,4 +267,6 @@
     <string name="period_schedule_date_overlap_error">日期范围与其他临时作息重叠</string>
     <string name="unknown">未知</string>
     <string name="course_table_import_warning">导入会替换现有课程、学期设置和作息。</string>
+    <string name="lock_overlay_course_position_content_desc">上课地点</string>
+    <string name="lock_overlay_teacher_content_desc">教师</string>
 </resources>

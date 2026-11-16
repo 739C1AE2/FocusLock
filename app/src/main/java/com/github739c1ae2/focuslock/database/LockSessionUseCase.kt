@@ -93,7 +93,7 @@ class LockSessionUseCase @Inject constructor(
         }
         for (course in courses.courses) {
             val isOngoing = course.sessions.any { session ->
-                CourseScheduleResolver.occurrencesOn(courses, course, session, today, zone)
+                CourseScheduleResolver.occurrencesOn(courses, session, today, zone)
                     .any { now >= it.startMillis && now < it.endMillis }
             }
             if (isOngoing) courseRepository.updateCourseActiveStatus(course.id, false)
@@ -157,17 +157,22 @@ internal fun calculateSessionPlan(
     val today = Instant.ofEpochMilli(nowMillis).atZone(zoneId).toLocalDate()
     for (course in courses.courses) {
         for (session in course.sessions) {
-            val occurrence = CourseScheduleResolver.occurrencesOn(courses, course, session, today, zoneId)
+            val occurrence = CourseScheduleResolver.occurrencesOn(courses, session, today, zoneId)
                 .firstOrNull { nowMillis >= it.startMillis && nowMillis < it.endMillis }
             if (occurrence != null) {
                 return planFor(ActiveLockSession(
-                    profileId = occurrence.profileId,
+                    profileId = course.profileId,
                     startTimeMillis = occurrence.startMillis,
                     endTimeMillis = occurrence.endMillis,
-                    source = LockSource.CourseSession(occurrence.courseId),
+                    source = LockSource.CourseSession(
+                        courseId = course.id,
+                        courseName = course.name,
+                        teacher = session.teacher,
+                        position = session.position
+                    ),
                 ))
             }
-            includeStart(CourseScheduleResolver.nextStart(courses, course, session, nowMillis, zoneId))
+            includeStart(CourseScheduleResolver.nextStart(courses, session, nowMillis, zoneId))
         }
     }
 

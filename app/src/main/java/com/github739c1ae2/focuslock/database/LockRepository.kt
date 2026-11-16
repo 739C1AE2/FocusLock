@@ -24,7 +24,12 @@ data class ProfileConfig(
 sealed class LockSource {
     object QuickLock : LockSource()
     data class Schedule(val scheduleId: Long) : LockSource()
-    data class CourseSession(val courseId: Long) : LockSource()
+    data class CourseSession(
+        val courseId: Long,
+        val courseName: String,
+        val teacher: String,
+        val position: String
+    ) : LockSource()
 }
 
 data class ActiveLockSession(

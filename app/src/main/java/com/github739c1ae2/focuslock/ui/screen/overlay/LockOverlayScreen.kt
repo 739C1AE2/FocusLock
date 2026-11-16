@@ -13,17 +13,21 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Android
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -48,6 +52,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
@@ -55,6 +60,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import com.github739c1ae2.focuslock.R
+import com.github739c1ae2.focuslock.database.LockSource
 import com.github739c1ae2.focuslock.ui.components.InputDialog
 import com.github739c1ae2.focuslock.util.AppIconRequest
 import com.github739c1ae2.focuslock.util.timestampMillisToClockString
@@ -123,13 +129,24 @@ fun LockedScreen(state: OverlayState.Locked, viewModel: OverlayViewModel) {
                 fontWeight = FontWeight.Bold
             )
 
-            Text(
-                text = "$startTime - $endTime",
-                modifier = Modifier
-                    .fillMaxWidth(),
-                textAlign = TextAlign.Center,
-                style = MaterialTheme.typography.titleMedium
-            )
+            when (val source = state.session.source) {
+                is LockSource.CourseSession -> {
+                    CurrentCourseCard(
+                        course = source,
+                        timeRange = "$startTime - $endTime",
+                        modifier = Modifier.padding(vertical = 16.dp)
+                    )
+                }
+
+                else -> {
+                    Text(
+                        text = "$startTime - $endTime",
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = TextAlign.Center,
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                }
+            }
 
             Text(
                 stringResource(R.string.allowed_apps),
@@ -230,6 +247,68 @@ fun LockedScreen(state: OverlayState.Locked, viewModel: OverlayViewModel) {
                 showUnlockDialog = false
             }
         )
+    }
+}
+
+@Composable
+private fun CurrentCourseCard(
+    course: LockSource.CourseSession,
+    timeRange: String,
+    modifier: Modifier = Modifier
+) {
+    Card(modifier = modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text(
+                text = course.courseName,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = timeRange,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (course.position.isNotBlank()) {
+                    Icon(
+                        imageVector = Icons.Default.LocationOn,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        contentDescription = stringResource(
+                            R.string.lock_overlay_course_position_content_desc
+                        )
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = course.position,
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Spacer(modifier = Modifier.width(16.dp))
+                }
+                if (course.teacher.isNotBlank()) {
+                    Icon(
+                        imageVector = Icons.Default.Person,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        contentDescription = stringResource(
+                            R.string.lock_overlay_teacher_content_desc
+                        )
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = course.teacher,
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -336,6 +415,23 @@ fun CountDownConfirmDialog(
             windowType = LocalOverlayWindowType.current
         )
     )
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun CurrentCourseCardPreview() {
+    MaterialTheme {
+        CurrentCourseCard(
+            course = LockSource.CourseSession(
+                courseId = 1L,
+                courseName = "高等数学",
+                teacher = "张老师",
+                position = "教学楼 A101"
+            ),
+            timeRange = "08:00:00 - 09:40:00",
+            modifier = Modifier.padding(16.dp)
+        )
+    }
 }
 
 @Preview

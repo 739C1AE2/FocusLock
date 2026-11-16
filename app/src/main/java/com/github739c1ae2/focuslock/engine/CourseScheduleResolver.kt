@@ -14,8 +14,6 @@ import java.time.temporal.ChronoUnit
 
 /** 一次具体课程窗口，起止时间为绝对毫秒时间戳。 */
 data class CourseOccurrence(
-    val courseId: Long,
-    val profileId: Long,
     val startMillis: Long,
     val endMillis: Long,
     val occurrenceEpochDay: Long,
@@ -40,7 +38,6 @@ object CourseScheduleResolver {
      */
     fun nextStart(
         data: CourseScheduleData,
-        course: Course,
         session: CourseSession,
         nowMillis: Long,
         zone: ZoneId,
@@ -55,7 +52,7 @@ object CourseScheduleResolver {
             if (week !in 1..data.totalWeeks) continue
             val date = firstWeek.plusWeeks((week - 1).toLong()).plusDays(dayOffset.toLong())
             if (date < today || date.toEpochDay() < semesterStart) continue
-            for (window in occurrencesOn(data, course, session, date, zone)) {
+            for (window in occurrencesOn(data, session, date, zone)) {
                 if (window.startMillis <= nowMillis) continue
                 return window.startMillis
             }
@@ -70,7 +67,6 @@ object CourseScheduleResolver {
      */
     fun occurrencesOn(
         data: CourseScheduleData,
-        course: Course,
         session: CourseSession,
         date: LocalDate,
         zone: ZoneId,
@@ -84,7 +80,7 @@ object CourseScheduleResolver {
             val end = date.atTime(endMinute / 60, endMinute % 60).atZone(zone).toInstant().toEpochMilli()
             // 夏令时可能将不同的本地分钟映射到同一时刻，转换后非正的窗口不能参与调度。
             if (end <= start) return@mapNotNull null
-            CourseOccurrence(course.id, course.profileId, start, end, date.toEpochDay())
+            CourseOccurrence(start, end, date.toEpochDay())
         }
     }
 
